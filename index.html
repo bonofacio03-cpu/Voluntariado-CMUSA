@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Registro de Eventos</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            padding: 2rem;
+            width: 90%;
+            max-width: 500px;
+            margin: 1rem;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .logo h1 {
+            color: #667eea;
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .logo p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 1rem;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            margin: 0.5rem 0;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #764ba2;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #6a4190;
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #333;
+            font-weight: bold;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 0.8rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .back-btn {
+            background: #6c757d;
+            color: white;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 1rem;
+        }
+
+        .event-card {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+
+        .event-card h3 {
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+
+        .event-info {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .qr-scanner {
+            text-align: center;
+            padding: 2rem 0;
+        }
+
+        .scanner-box {
+            width: 250px;
+            height: 250px;
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            margin: 1rem auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f8f9fa;
+        }
+
+        .scanner-text {
+            color: #667eea;
+            font-size: 1.1rem;
+            text-align: center;
+        }
+
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            text-align: center;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            text-align: center;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                width: 95%;
+                padding: 1.5rem;
+            }
+            
+            .scanner-box {
+                width: 200px;
+                height: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Página Principal -->
+        <div id="homePage" class="page active">
+            <div class="logo">
+                <h1>📅 EventReg</h1>
+                <p>Sistema de Registro de Eventos</p>
+            </div>
+            
+            <button class="btn btn-primary" onclick="showPage('loginPage')">
+                👨‍💼 Acceso Organizador
+            </button>
+            
+            <button class="btn btn-secondary" onclick="showPage('attendeePage')">
+                👥 Soy Asistente
+            </button>
+        </div>
+
+        <!-- Login Organizador -->
+        <div id="loginPage" class="page">
+            <button class="back-btn" onclick="showPage('homePage')">← Volver</button>
+            
+            <div class="logo">
+                <h1>Iniciar Sesión</h1>
+                <p>Organizador</p>
+            </div>
+            
+            <form onsubmit="login(event)">
+                <div class="form-group">
+                    <label for="username">Usuario:</label>
+                    <input type="text" id="username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Contraseña:</label>
+                    <input type="password" id="password" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Entrar</button>
+            </form>
+            
+            <div id="loginError" class="error-message" style="display: none;"></div>
+        </div>
+
+        <!-- Panel Organizador -->
+        <div id="organizerPanel" class="page">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h1>Panel Organizador</h1>
+                <button class="back-btn" onclick="logout()">Cerrar Sesión</button>
+            </div>
+            
+            <button class="btn btn-primary" onclick="showPage('createEventPage')">
+                ➕ Crear Evento
+            </button>
+            
+            <button class="btn btn-secondary" onclick="showPage('viewEventsPage')">
+                📋 Ver Eventos
+            </button>
+        </div>
+
+        <!-- Crear Evento -->
+        <div id="createEventPage" class="page">
+            <button class="back-btn" onclick="showPage('organizerPanel')">← Volver</button>
+            
+            <h1>Crear Evento</h1>
+            
+            <form onsubmit="createEvent(event)">
+                <div class="form-group">
+                    <label for="eventName">Nombre del Evento:</label>
+                    <input type="text" id="eventName" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="eventDay">Día de la Semana:</label>
+                    <select id="eventDay" required>
+                        <option value="">Seleccionar día</option>
+                        <option value="1">Lunes</option>
+                        <option value="2">Martes</option>
+                        <option value="3">Miércoles</option>
+                        <option value="4">Jueves</option>
+                        <option value="5">Viernes</option>
+                        <option value="6">Sábado</option>
+                        <option value="0">Domingo</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="eventTime">Hora:</label>
+                    <input type="time" id="eventTime" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="eventLocation">Ubicación:</label>
+                    <input type="text" id="eventLocation" required>
+                </div>
+                
+                <button type="submit" class="btn btn-success">Crear Evento</button>
+            </form>
+            
+            <div id="createEventSuccess" class="success-message" style="display: none;"></div>
+        </div>
+
+        <!-- Ver Eventos -->
+        <div id="viewEventsPage" class="page">
+            <button class="back-btn" onclick="showPage('organizerPanel')">← Volver</button>
+            
+            <h1>Eventos Programados</h1>
+            
+            <div id="eventsList">
+                <!-- Los eventos se cargarán aquí -->
+            </div>
+        </div>
+
+        <!-- Página Asistente -->
+        <div id="attendeePage" class="page">
+            <button class="back-btn" onclick="showPage('homePage')">← Volver</button>
+            
+            <div class="logo">
+                <h1>Registro de Asistente</h1>
+                <p>Escanea el código QR del evento</p>
+            </div>
+            
+            <div class="qr-scanner">
+                <div class="scanner-box">
+                    <div class="scanner-text">
+                        📱<br>
+                        Presiona para escanear<br>
+                        código QR
+                    </div>
+                </div>
+                
+                <button class="btn btn-primary" onclick="simulateQRScan()">
+                    📷 Escanear QR
+                </button>
+            </div>
+            
+            <div id="scanResult" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Datos simulados (en una aplicación real estarían en una base de datos)
+        let events = [];
+        let isLoggedIn = false;
+        const credentials = { username: 'admin', password: '123456' };
+
+        function showPage(pageId) {
+            // Ocultar todas las páginas
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+            
+            // Mostrar la página seleccionada
+            document.getElementById(pageId).classList.add('active');
+            
+            // Cargar eventos si vamos a la página de ver eventos
+            if (pageId === 'viewEventsPage') {
+                loadEvents();
+            }
+        }
+
+        function login(event) {
+            event.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (username === credentials.username && password === credentials.password) {
+                isLoggedIn = true;
+                showPage('organizerPanel');
+                // Limpiar campos
+                document.getElementById('username').value = '';
+                document.getElementById('password').value = '';
+            } else {
+                const errorDiv = document.getElementById('loginError');
+                errorDiv.textContent = 'Usuario o contraseña incorrectos';
+                errorDiv.style.display = 'block';
+                
+                setTimeout(() => {
+                    errorDiv.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        function logout() {
+            isLoggedIn = false;
+            showPage('homePage');
+        }
+
+        function createEvent(event) {
+            event.preventDefault();
+            
+            if (!isLoggedIn) return;
+            
+            const eventData = {
+                id: Date.now(),
+                name: document.getElementById('eventName').value,
+                day: parseInt(document.getElementById('eventDay').value),
+                time: document.getElementById('eventTime').value,
+                location: document.getElementById('eventLocation').value,
+                created: new Date().toLocaleString()
+            };
+            
+            events.push(eventData);
+            
+            // Mostrar mensaje de éxito
+            const successDiv = document.getElementById('createEventSuccess');
+            successDiv.textContent = '¡Evento creado exitosamente!';
+            successDiv.style.display = 'block';
+            
+            // Limpiar formulario
+            document.querySelector('#createEventPage form').reset();
+            
+            setTimeout(() => {
+                successDiv.style.display = 'none';
+                showPage('organizerPanel');
+            }, 2000);
+        }
+
+        function loadEvents() {
+            const eventsList = document.getElementById('eventsList');
+            
+            if (events.length === 0) {
+                eventsList.innerHTML = '<p style="text-align: center; color: #666;">No hay eventos programados</p>';
+                return;
+            }
+            
+            const daysOfWeek = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+            
+            eventsList.innerHTML = events.map(event => `
+                <div class="event-card">
+                    <h3>${event.name}</h3>
+                    <div class="event-info">
+                        <p><strong>📅 Día:</strong> ${daysOfWeek[event.day]} (semanal)</p>
+                        <p><strong>⏰ Hora:</strong> ${event.time}</p>
+                        <p><strong>📍 Ubicación:</strong> ${event.location}</p>
+                        <p><strong>📊 QR ID:</strong> ${event.id}</p>
+                        <p><strong>Creado:</strong> ${event.created}</p>
+                    </div>
+                    <button class="btn btn-danger" onclick="deleteEvent(${event.id})" style="margin-top: 1rem;">
+                        🗑️ Eliminar
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function deleteEvent(eventId) {
+            if (confirm('¿Estás seguro de que quieres eliminar este evento?')) {
+                events = events.filter(event => event.id !== eventId);
+                loadEvents();
+            }
+        }
+
+        function simulateQRScan() {
+            // Simular el escaneo de QR
+            const resultDiv = document.getElementById('scanResult');
+            
+            if (events.length === 0) {
+                resultDiv.innerHTML = '<div class="error-message">No hay eventos disponibles</div>';
+                resultDiv.style.display = 'block';
+                return;
+            }
+            
+            // Simular que se escaneó un evento válido
+            const randomEvent = events[Math.floor(Math.random() * events.length)];
+            const now = new Date();
+            const daysOfWeek = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+            
+            // Verificar si es el día correcto y dentro del tiempo permitido
+            const currentDay = now.getDay();
+            const currentTime = now.getHours() * 60 + now.getMinutes();
+            const eventTime = parseInt(randomEvent.time.split(':')[0]) * 60 + parseInt(randomEvent.time.split(':')[1]);
+            const timeDiff = Math.abs(currentTime - eventTime);
+            
+            if (currentDay === randomEvent.day && timeDiff <= 60) {
+                // Registro exitoso
+                resultDiv.innerHTML = `
+                    <div class="success-message">
+                        <h3>✅ ¡Registro Exitoso!</h3>
+                        <p><strong>Evento:</strong> ${randomEvent.name}</p>
+                        <p><strong>Ubicación:</strong> ${randomEvent.location}</p>
+                        <p><strong>Hora:</strong> ${randomEvent.time}</p>
+                        <p><strong>Registrado:</strong> ${now.toLocaleString()}</p>
+                    </div>
+                `;
+            } else {
+                // Fuera del tiempo permitido
+                resultDiv.innerHTML = `
+                    <div class="error-message">
+                        <h3>❌ Registro No Disponible</h3>
+                        <p><strong>Evento:</strong> ${randomEvent.name}</p>
+                        <p><strong>Día programado:</strong> ${daysOfWeek[randomEvent.day]}</p>
+                        <p><strong>Hora:</strong> ${randomEvent.time}</p>
+                        <p>Solo puedes registrarte 1 hora antes del inicio del evento y en el día correcto.</p>
+                    </div>
+                `;
+            }
+            
+            resultDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                resultDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // Cargar eventos de ejemplo al inicio
+        window.onload = function() {
+            // Agregar algunos eventos de ejemplo
+            events = [
+                {
+                    id: 1,
+                    name: 'Reunión de Equipo',
+                    day: 1, // Lunes
+                    time: '10:00',
+                    location: 'Sala de Conferencias A',
+                    created: '2025-01-15 09:30:00'
+                },
+                {
+                    id: 2,
+                    name: 'Clase de Yoga',
+                    day: 3, // Miércoles
+                    time: '18:00',
+                    location: 'Gimnasio Principal',
+                    created: '2025-01-16 14:20:00'
+                }
+            ];
+        };
+    </script>
+</body>
+</html>
