@@ -156,35 +156,29 @@
             margin-bottom: 1rem;
         }
 
-        .qr-code {
+        .qr-display {
             text-align: center;
             margin: 1rem 0;
-            padding: 1rem;
-            background: white;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
             border-radius: 8px;
         }
 
-        .qr-scanner {
-            text-align: center;
-            padding: 2rem 0;
+        .qr-display h4 {
+            color: #495057;
+            margin-bottom: 1rem;
         }
 
-        .scanner-box {
-            width: 250px;
-            height: 250px;
-            border: 3px dashed #667eea;
-            border-radius: 15px;
-            margin: 1rem auto;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #f8f9fa;
-        }
-
-        .scanner-text {
-            color: #667eea;
-            font-size: 1.1rem;
-            text-align: center;
+        .qr-code-text {
+            font-family: monospace;
+            font-size: 1.2rem;
+            background: white;
+            padding: 1rem;
+            border-radius: 5px;
+            word-break: break-all;
+            border: 1px solid #dee2e6;
+            color: #495057;
         }
 
         .success-message {
@@ -209,6 +203,7 @@
             text-align: center;
             color: #667eea;
             font-size: 1.1rem;
+            padding: 2rem;
         }
 
         .attendee-form {
@@ -236,7 +231,7 @@
             border-bottom: none;
         }
 
-        .connection-status {
+        .status {
             position: fixed;
             top: 10px;
             right: 10px;
@@ -246,12 +241,12 @@
             z-index: 1000;
         }
 
-        .connected {
+        .status.connected {
             background: #d4edda;
             color: #155724;
         }
 
-        .disconnected {
+        .status.disconnected {
             background: #f8d7da;
             color: #721c24;
         }
@@ -261,18 +256,11 @@
                 width: 95%;
                 padding: 1.5rem;
             }
-            
-            .scanner-box {
-                width: 200px;
-                height: 200px;
-            }
         }
     </style>
 </head>
 <body>
-    <div id="connectionStatus" class="connection-status disconnected">
-        🔴 Conectando...
-    </div>
+    <div id="status" class="status disconnected">🔴 Conectando...</div>
 
     <div class="container">
         <!-- Página Principal -->
@@ -369,10 +357,10 @@
                     <input type="text" id="eventLocation" required>
                 </div>
                 
-                <button type="submit" class="btn btn-success" id="createEventBtn">Crear Evento</button>
+                <button type="submit" class="btn btn-success" id="createBtn">Crear Evento</button>
             </form>
             
-            <div id="createEventSuccess" class="success-message" style="display: none;"></div>
+            <div id="createResult" style="display: none;"></div>
         </div>
 
         <!-- Ver Eventos -->
@@ -392,24 +380,19 @@
             
             <div class="logo">
                 <h1>Registro de Asistente</h1>
-                <p>Escanea el código QR del evento</p>
+                <p>Ingresa el código del evento</p>
             </div>
             
-            <div class="qr-scanner">
-                <div class="scanner-box">
-                    <div class="scanner-text">
-                        📱<br>
-                        Presiona para escanear<br>
-                        código QR
-                    </div>
+            <form onsubmit="processEventCode(event)">
+                <div class="form-group">
+                    <label for="eventCode">Código del Evento:</label>
+                    <input type="text" id="eventCode" required placeholder="Ingresa el código del evento">
                 </div>
                 
-                <button class="btn btn-primary" onclick="simulateQRScan()">
-                    📷 Escanear QR
-                </button>
-            </div>
+                <button type="submit" class="btn btn-primary">Buscar Evento</button>
+            </form>
             
-            <div id="scanResult" style="display: none;"></div>
+            <div id="eventCodeResult" style="display: none;"></div>
         </div>
 
         <!-- Formulario de Registro de Asistente -->
@@ -435,16 +418,12 @@
         </div>
     </div>
 
-    <!-- Firebase SDKs -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-firestore-compat.min.js"></script>
-    
-    <!-- QR Code Generator - Multiple CDN fallbacks -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js" 
-            onerror="loadQRCodeFallback()"></script>
+    <!-- Firebase Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
 
     <script>
-        // Configuración de Firebase
+        // Configuración Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyBR1Pt67y9SZ7nwciiemMhfaAe-jO1wMaY",
             authDomain: "voluntariadocmusa.firebaseapp.com",
@@ -457,115 +436,55 @@
 
         // Variables globales
         let db;
-        let isFirebaseConnected = false;
+        let isConnected = false;
         let isLoggedIn = false;
         let currentEventId = null;
-        let qrCodeLibLoaded = false;
         const credentials = { username: 'admin', password: '123456' };
 
-        // Función para cargar QRCode como fallback
-        function loadQRCodeFallback() {
-            console.log('⚠️ Cargando QRCode desde CDN alternativo...');
-            
-            const fallbackSources = [
-                'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js',
-                'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js',
-                'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js'
-            ];
-            
-            let currentFallback = 0;
-            
-            function tryNextFallback() {
-                if (currentFallback >= fallbackSources.length) {
-                    console.error('❌ No se pudo cargar ninguna librería QR');
-                    qrCodeLibLoaded = false;
-                    return;
-                }
-                
-                const script = document.createElement('script');
-                script.src = fallbackSources[currentFallback];
-                script.onload = function() {
-                    console.log(`✅ QRCode cargado desde: ${fallbackSources[currentFallback]}`);
-                    qrCodeLibLoaded = true;
-                    checkQRCodeAvailability();
-                };
-                script.onerror = function() {
-                    console.log(`❌ Falló: ${fallbackSources[currentFallback]}`);
-                    currentFallback++;
-                    tryNextFallback();
-                };
-                document.head.appendChild(script);
-            }
-            
-            tryNextFallback();
-        }
-
-        // Verificar disponibilidad de QRCode
-        function checkQRCodeAvailability() {
-            if (typeof QRCode !== 'undefined') {
-                qrCodeLibLoaded = true;
-                console.log('✅ QRCode library disponible');
-                return true;
-            } else {
-                console.warn('⚠️ QRCode library no disponible');
-                qrCodeLibLoaded = false;
-                return false;
-            }
-        }
-
         // Inicializar Firebase
-        async function initializeFirebase() {
+        function initFirebase() {
             try {
-                // Verificar si Firebase ya está inicializado
-                if (firebase.apps.length === 0) {
+                if (!firebase.apps.length) {
                     firebase.initializeApp(firebaseConfig);
                 }
-                
                 db = firebase.firestore();
                 
-                // Configurar settings de Firestore
-                db.settings({
-                    cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
-                });
-                
-                // Probar la conexión
-                await db.collection('events').limit(1).get();
-                
-                isFirebaseConnected = true;
-                updateConnectionStatus(true);
-                console.log('✅ Firebase conectado exitosamente');
-                
+                // Test de conexión simple
+                db.collection('events').limit(1).get()
+                    .then(() => {
+                        isConnected = true;
+                        updateStatus(true);
+                        console.log('Firebase conectado');
+                    })
+                    .catch((error) => {
+                        console.error('Error Firebase:', error);
+                        isConnected = false;
+                        updateStatus(false);
+                    });
+                    
             } catch (error) {
-                console.error('❌ Error conectando Firebase:', error);
-                isFirebaseConnected = false;
-                updateConnectionStatus(false);
-                
-                // Mostrar error específico
-                if (error.code === 'permission-denied') {
-                    console.log('Error de permisos. Verifica las reglas de Firestore');
-                } else if (error.code === 'unavailable') {
-                    console.log('Firebase no disponible. Verifica tu conexión');
-                }
+                console.error('Error inicializando Firebase:', error);
+                isConnected = false;
+                updateStatus(false);
             }
         }
 
-        function updateConnectionStatus(connected) {
-            const statusEl = document.getElementById('connectionStatus');
+        function updateStatus(connected) {
+            const statusEl = document.getElementById('status');
             if (connected) {
-                statusEl.className = 'connection-status connected';
-                statusEl.innerHTML = '🟢 Firestore Conectado';
+                statusEl.className = 'status connected';
+                statusEl.textContent = '🟢 Conectado';
             } else {
-                statusEl.className = 'connection-status disconnected';
-                statusEl.innerHTML = '🔴 Firestore Desconectado';
+                statusEl.className = 'status disconnected';
+                statusEl.textContent = '🔴 Sin conexión';
             }
         }
 
-        // Funciones de navegación
+        // Navegación
         function showPage(pageId) {
             document.querySelectorAll('.page').forEach(page => {
                 page.classList.remove('active');
             });
-            
             document.getElementById(pageId).classList.add('active');
             
             if (pageId === 'viewEventsPage') {
@@ -573,7 +492,7 @@
             }
         }
 
-        // Funciones de autenticación
+        // Autenticación
         function login(event) {
             event.preventDefault();
             
@@ -583,17 +502,10 @@
             if (username === credentials.username && password === credentials.password) {
                 isLoggedIn = true;
                 showPage('organizerPanel');
-                document.getElementById('username').value = '';
-                document.getElementById('password').value = '';
                 document.getElementById('loginError').style.display = 'none';
             } else {
-                const errorDiv = document.getElementById('loginError');
-                errorDiv.textContent = 'Usuario o contraseña incorrectos';
-                errorDiv.style.display = 'block';
-                
-                setTimeout(() => {
-                    errorDiv.style.display = 'none';
-                }, 3000);
+                document.getElementById('loginError').textContent = 'Credenciales incorrectas';
+                document.getElementById('loginError').style.display = 'block';
             }
         }
 
@@ -602,24 +514,24 @@
             showPage('homePage');
         }
 
-        // Funciones de eventos
+        // Crear evento
         async function createEvent(event) {
             event.preventDefault();
             
-            if (!isLoggedIn) {
-                alert('Debes estar logueado para crear eventos');
+            const createBtn = document.getElementById('createBtn');
+            const resultDiv = document.getElementById('createResult');
+            
+            createBtn.disabled = true;
+            createBtn.textContent = 'Creando...';
+            resultDiv.style.display = 'none';
+
+            if (!isConnected) {
+                showResult('createResult', false, 'No hay conexión a Firebase');
+                createBtn.disabled = false;
+                createBtn.textContent = 'Crear Evento';
                 return;
             }
 
-            if (!isFirebaseConnected) {
-                alert('No hay conexión con Firestore. Verifica tu configuración.');
-                return;
-            }
-            
-            const createBtn = document.getElementById('createEventBtn');
-            createBtn.disabled = true;
-            createBtn.textContent = 'Creando...';
-            
             try {
                 const eventData = {
                     id: Date.now().toString(),
@@ -627,618 +539,227 @@
                     day: parseInt(document.getElementById('eventDay').value),
                     time: document.getElementById('eventTime').value,
                     location: document.getElementById('eventLocation').value.trim(),
-                    created: firebase.firestore.FieldValue.serverTimestamp(),
+                    created: new Date(),
                     attendees: []
                 };
-                
-                console.log('Creando evento en Firestore:', eventData);
-                
-                // Guardar en Firestore
+
                 await db.collection('events').doc(eventData.id).set(eventData);
                 
-                console.log('✅ Evento guardado exitosamente en Firestore');
-                
-                const successDiv = document.getElementById('createEventSuccess');
-                successDiv.innerHTML = `
-                    <h3>✅ ¡Evento creado exitosamente!</h3>
-                    <p><strong>Nombre:</strong> ${eventData.name}</p>
-                    <p><strong>ID:</strong> ${eventData.id}</p>
-                `;
-                successDiv.style.display = 'block';
-                
+                showResult('createResult', true, `Evento "${eventData.name}" creado exitosamente. Código: ${eventData.id}`);
                 document.querySelector('#createEventPage form').reset();
                 
-                setTimeout(() => {
-                    successDiv.style.display = 'none';
-                    showPage('viewEventsPage');
-                }, 2000);
-                
+                setTimeout(() => showPage('viewEventsPage'), 2000);
+
             } catch (error) {
-                console.error('❌ Error creando evento:', error);
-                
-                const successDiv = document.getElementById('createEventSuccess');
-                successDiv.innerHTML = `
-                    <div class="error-message">
-                        <h3>❌ Error al crear evento</h3>
-                        <p>${error.message}</p>
-                    </div>
-                `;
-                successDiv.style.display = 'block';
-            } finally {
-                createBtn.disabled = false;
-                createBtn.textContent = 'Crear Evento';
+                console.error('Error:', error);
+                showResult('createResult', false, 'Error al crear evento: ' + error.message);
             }
+
+            createBtn.disabled = false;
+            createBtn.textContent = 'Crear Evento';
         }
 
+        // Cargar eventos
         async function loadEvents() {
             const eventsList = document.getElementById('eventsList');
-            eventsList.innerHTML = '<div class="loading">🔄 Cargando eventos desde Firestore...</div>';
-            
-            if (!isFirebaseConnected) {
-                eventsList.innerHTML = `
-                    <div class="error-message">
-                        <h3>❌ Sin conexión a Firestore</h3>
-                        <p>Verifica tu configuración de Firebase</p>
-                    </div>
-                `;
+            eventsList.innerHTML = '<div class="loading">Cargando eventos...</div>';
+
+            if (!isConnected) {
+                eventsList.innerHTML = '<div class="error-message">No hay conexión a Firebase</div>';
                 return;
             }
-            
+
             try {
-                console.log('Cargando eventos desde Firestore...');
-                
-                const snapshot = await db.collection('events')
-                    .orderBy('created', 'desc')
-                    .get();
-                
-                const events = [];
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    // Convertir timestamp de Firestore a fecha
-                    if (data.created && data.created.toDate) {
-                        data.created = data.created.toDate().toISOString();
-                    } else if (!data.created) {
-                        data.created = new Date().toISOString();
-                    }
-                    events.push(data);
-                });
-                
-                console.log(`✅ ${events.length} eventos cargados desde Firestore`);
-                
+                const snapshot = await db.collection('events').orderBy('created', 'desc').get();
+                const events = snapshot.docs.map(doc => doc.data());
+
                 if (events.length === 0) {
-                    eventsList.innerHTML = `
-                        <div style="text-align: center; padding: 2rem;">
-                            <h3>📋 No hay eventos programados</h3>
-                            <p>Crea tu primer evento desde el panel de organizador</p>
-                        </div>
-                    `;
+                    eventsList.innerHTML = '<div style="text-align: center; padding: 2rem;"><h3>No hay eventos</h3><p>Crea tu primer evento</p></div>';
                     return;
                 }
-                
+
                 const daysOfWeek = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
                 eventsList.innerHTML = '';
-                
-                for (const eventData of events) {
+
+                events.forEach(eventData => {
                     const eventCard = document.createElement('div');
                     eventCard.className = 'event-card';
                     
-                    // Lista de asistentes
                     let attendeesList = '';
                     if (eventData.attendees && eventData.attendees.length > 0) {
                         attendeesList = `
                             <div class="attendee-list">
-                                <strong>✅ Asistentes registrados (${eventData.attendees.length}):</strong>
+                                <strong>Asistentes (${eventData.attendees.length}):</strong>
                                 ${eventData.attendees.map(attendee => 
-                                    `<div class="attendee-item">
-                                        👤 ${attendee.name} - 
-                                        📅 ${new Date(attendee.timestamp).toLocaleString()}
-                                    </div>`
+                                    `<div class="attendee-item">${attendee.name} - ${new Date(attendee.timestamp).toLocaleString()}</div>`
                                 ).join('')}
                             </div>
                         `;
                     }
-                    
+
                     eventCard.innerHTML = `
-                        <h3>📅 ${eventData.name}</h3>
+                        <h3>${eventData.name}</h3>
                         <div class="event-info">
-                            <p><strong>📅 Día:</strong> ${daysOfWeek[eventData.day]} (semanal)</p>
-                            <p><strong>⏰ Hora:</strong> ${eventData.time}</p>
-                            <p><strong>📍 Ubicación:</strong> ${eventData.location}</p>
-                            <p><strong>🔑 ID del Evento:</strong> ${eventData.id}</p>
-                            <p><strong>📆 Creado:</strong> ${new Date(eventData.created).toLocaleString()}</p>
+                            <p><strong>Día:</strong> ${daysOfWeek[eventData.day]} (semanal)</p>
+                            <p><strong>Hora:</strong> ${eventData.time}</p>
+                            <p><strong>Ubicación:</strong> ${eventData.location}</p>
+                            <p><strong>Creado:</strong> ${new Date(eventData.created.toDate()).toLocaleString()}</p>
                         </div>
-                        <div class="qr-code">
-                            <p><strong>📱 Código QR del Evento:</strong></p>
-                            <div id="qr-${eventData.id}" style="min-height: 200px; display: flex; align-items: center; justify-content: center;">
-                                <div class="loading">⏳ Generando QR...</div>
-                            </div>
+                        <div class="qr-display">
+                            <h4>📱 Código del Evento</h4>
+                            <div class="qr-code-text">${eventData.id}</div>
+                            <p style="margin-top: 0.5rem; color: #666; font-size: 0.9rem;">
+                                Los asistentes deben usar este código para registrarse
+                            </p>
                         </div>
                         ${attendeesList}
-                        <button class="btn btn-danger" onclick="deleteEvent('${eventData.id}')" style="margin-top: 1rem;">
-                            🗑️ Eliminar Evento
+                        <button class="btn btn-danger" onclick="deleteEvent('${eventData.id}')">
+                            🗑️ Eliminar
                         </button>
                     `;
                     
                     eventsList.appendChild(eventCard);
-                    
-                    // Generar QR Code
-                    setTimeout(() => {
-                        generateQRCode(eventData.id);
-                    }, 100);
-                }
-                
-            } catch (error) {
-                console.error('❌ Error cargando eventos:', error);
-                eventsList.innerHTML = `
-                    <div class="error-message">
-                        <h3>❌ Error al cargar eventos</h3>
-                        <p>${error.message}</p>
-                        <p>Código: ${error.code || 'Desconocido'}</p>
-                    </div>
-                `;
-            }
-        }
-
-        async function generateQRCode(eventId) {
-            try {
-                const qrContainer = document.getElementById(`qr-${eventId}`);
-                if (!qrContainer) {
-                    console.warn(`Container QR no encontrado para evento ${eventId}`);
-                    return;
-                }
-
-                // Verificar si QRCode está disponible
-                if (!qrCodeLibLoaded || typeof QRCode === 'undefined') {
-                    console.warn('⚠️ QRCode library no disponible, mostrando código como texto');
-                    qrContainer.innerHTML = `
-                        <div style="background: #f8f9fa; padding: 1rem; border: 2px dashed #dee2e6; border-radius: 8px;">
-                            <p style="margin: 0; font-weight: bold; color: #495057;">📱 Código del Evento:</p>
-                            <p style="margin: 0.5rem 0; font-family: monospace; background: white; padding: 0.5rem; border-radius: 4px; word-break: break-all;">${eventId}</p>
-                            <small style="color: #6c757d;">Usa este código para registrarte en el evento</small>
-                        </div>
-                    `;
-                    return;
-                }
-
-                // Limpiar el container
-                qrContainer.innerHTML = '<div class="loading">⏳ Generando QR...</div>';
-                
-                // Crear canvas para el QR
-                const canvas = document.createElement('canvas');
-                
-                await QRCode.toCanvas(canvas, eventId, {
-                    width: 200,
-                    margin: 2,
-                    color: {
-                        dark: '#000000',
-                        light: '#ffffff'
-                    },
-                    errorCorrectionLevel: 'M'
                 });
-                
-                // Limpiar y agregar el canvas
-                qrContainer.innerHTML = '';
-                qrContainer.appendChild(canvas);
-                
-                // Agregar texto del código debajo del QR
-                const codeText = document.createElement('div');
-                codeText.style.marginTop = '0.5rem';
-                codeText.style.fontSize = '0.8rem';
-                codeText.style.color = '#666';
-                codeText.innerHTML = `<strong>Código:</strong> ${eventId}`;
-                qrContainer.appendChild(codeText);
-                
-                console.log(`✅ QR generado para evento ${eventId}`);
-                
+
             } catch (error) {
-                console.error(`❌ Error generando QR para evento ${eventId}:`, error);
-                const qrContainer = document.getElementById(`qr-${eventId}`);
-                if (qrContainer) {
-                    qrContainer.innerHTML = `
-                        <div style="background: #f8d7da; color: #721c24; padding: 1rem; border-radius: 8px;">
-                            <p style="margin: 0; font-weight: bold;">❌ Error generando QR</p>
-                            <p style="margin: 0.5rem 0; font-family: monospace; background: rgba(255,255,255,0.7); padding: 0.5rem; border-radius: 4px; word-break: break-all;">${eventId}</p>
-                            <small>Usa el código de arriba para registrarte</small>
-                        </div>
-                    `;
-                }
+                console.error('Error:', error);
+                eventsList.innerHTML = `<div class="error-message">Error al cargar eventos: ${error.message}</div>`;
             }
         }
 
+        // Eliminar evento
         async function deleteEvent(eventId) {
-            if (!confirm('¿Estás seguro de que quieres eliminar este evento?')) return;
-            
-            if (!isFirebaseConnected) {
-                alert('No hay conexión con Firestore');
-                return;
-            }
+            if (!confirm('¿Eliminar este evento?')) return;
             
             try {
-                console.log(`Eliminando evento ${eventId}...`);
                 await db.collection('events').doc(eventId).delete();
-                console.log(`✅ Evento ${eventId} eliminado`);
                 loadEvents();
             } catch (error) {
-                console.error('❌ Error eliminando evento:', error);
-                alert(`Error al eliminar el evento: ${error.message}`);
+                alert('Error al eliminar: ' + error.message);
             }
         }
 
-        // Funciones de escáner QR y registro de asistentes
-        async function simulateQRScan() {
-            const resultDiv = document.getElementById('scanResult');
-            resultDiv.innerHTML = '<div class="loading">🔍 Buscando eventos disponibles...</div>';
-            resultDiv.style.display = 'block';
+        // Procesar código de evento
+        async function processEventCode(event) {
+            event.preventDefault();
             
-            if (!isFirebaseConnected) {
-                resultDiv.innerHTML = '<div class="error-message">❌ No hay conexión con Firestore</div>';
+            const eventCode = document.getElementById('eventCode').value.trim();
+            const resultDiv = document.getElementById('eventCodeResult');
+            
+            if (!isConnected) {
+                showResult('eventCodeResult', false, 'No hay conexión a Firebase');
                 return;
             }
-            
-            try {
-                const snapshot = await db.collection('events').get();
-                const events = [];
-                
-                snapshot.forEach(doc => {
-                    events.push(doc.data());
-                });
-                
-                if (events.length === 0) {
-                    resultDiv.innerHTML = '<div class="error-message">❌ No hay eventos disponibles</div>';
-                    return;
-                }
-                
-                // Simular escaneo de un evento aleatorio
-                const randomEvent = events[Math.floor(Math.random() * events.length)];
-                await processQRScan(randomEvent.id);
-                
-            } catch (error) {
-                console.error('❌ Error en simulación de escaneo:', error);
-                resultDiv.innerHTML = `<div class="error-message">❌ Error al buscar eventos: ${error.message}</div>`;
-            }
-        }
 
-        async function processQRScan(eventId) {
-            const resultDiv = document.getElementById('scanResult');
-            
+            resultDiv.innerHTML = '<div class="loading">Buscando evento...</div>';
+            resultDiv.style.display = 'block';
+
             try {
-                console.log(`Procesando QR para evento ${eventId}...`);
-                
-                const doc = await db.collection('events').doc(eventId).get();
+                const doc = await db.collection('events').doc(eventCode).get();
                 
                 if (!doc.exists) {
-                    resultDiv.innerHTML = '<div class="error-message">❌ Evento no encontrado</div>';
-                    resultDiv.style.display = 'block';
+                    showResult('eventCodeResult', false, 'Evento no encontrado');
                     return;
                 }
-                
+
                 const eventData = doc.data();
                 
-                // Verificar tiempo y día
+                // Verificar día y hora
                 const now = new Date();
                 const currentDay = now.getDay();
                 const currentTime = now.getHours() * 60 + now.getMinutes();
                 const eventTime = parseInt(eventData.time.split(':')[0]) * 60 + parseInt(eventData.time.split(':')[1]);
                 const timeDiff = Math.abs(currentTime - eventTime);
-                
+
                 if (currentDay !== eventData.day || timeDiff > 60) {
                     const daysOfWeek = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-                    resultDiv.innerHTML = `
-                        <div class="error-message">
-                            <h3>❌ Registro No Disponible</h3>
-                            <p><strong>Evento:</strong> ${eventData.name}</p>
-                            <p><strong>Día programado:</strong> ${daysOfWeek[eventData.day]}</p>
-                            <p><strong>Hora:</strong> ${eventData.time}</p>
-                            <p><strong>Día actual:</strong> ${daysOfWeek[currentDay]}</p>
-                            <p><strong>Hora actual:</strong> ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}</p>
-                            <p>⚠️ Solo puedes registrarte 1 hora antes del inicio del evento y en el día correcto.</p>
-                        </div>
-                    `;
-                    resultDiv.style.display = 'block';
+                    showResult('eventCodeResult', false, 
+                        `Evento: ${eventData.name}<br>
+                         Día: ${daysOfWeek[eventData.day]} a las ${eventData.time}<br>
+                         Solo puedes registrarte 1 hora antes del evento y el día correcto`);
                     return;
                 }
-                
-                // Mostrar formulario de registro
-                currentEventId = eventId;
+
+                currentEventId = eventCode;
                 showAttendeeForm(eventData);
-                
+
             } catch (error) {
-                console.error('❌ Error procesando QR:', error);
-                resultDiv.innerHTML = `<div class="error-message">❌ Error al procesar el código QR: ${error.message}</div>`;
-                resultDiv.style.display = 'block';
+                showResult('eventCodeResult', false, 'Error: ' + error.message);
             }
         }
 
+        // Mostrar formulario de asistente
         function showAttendeeForm(eventData) {
             const daysOfWeek = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
             
             document.getElementById('eventDetails').innerHTML = `
-                <h3>✅ Evento Válido para Registro</h3>
-                <p><strong>📅 Evento:</strong> ${eventData.name}</p>
-                <p><strong>📍 Ubicación:</strong> ${eventData.location}</p>
-                <p><strong>📆 Día:</strong> ${daysOfWeek[eventData.day]}</p>
-                <p><strong>⏰ Hora:</strong> ${eventData.time}</p>
-                <p><strong>🎯 Estado:</strong> Registro abierto</p>
+                <h3>✅ Evento Válido</h3>
+                <p><strong>Evento:</strong> ${eventData.name}</p>
+                <p><strong>Ubicación:</strong> ${eventData.location}</p>
+                <p><strong>Día:</strong> ${daysOfWeek[eventData.day]}</p>
+                <p><strong>Hora:</strong> ${eventData.time}</p>
             `;
             
             document.getElementById('attendeeName').value = '';
             document.getElementById('registrationResult').style.display = 'none';
-            
             showPage('attendeeFormPage');
         }
 
+        // Registrar asistente
         async function registerAttendee(event) {
             event.preventDefault();
             
-            if (!currentEventId) {
-                alert('Error: No hay evento seleccionado');
-                return;
-            }
-
-            if (!isFirebaseConnected) {
-                alert('Error: No hay conexión con Firestore');
-                return;
-            }
-            
-            const attendeeName = document.getElementById('attendeeName').value.trim();
-            const resultDiv = document.getElementById('registrationResult');
             const registerBtn = document.getElementById('registerBtn');
-            
-            if (!attendeeName) {
-                alert('Por favor ingresa tu nombre completo');
-                return;
-            }
+            const attendeeName = document.getElementById('attendeeName').value.trim();
             
             registerBtn.disabled = true;
             registerBtn.textContent = 'Registrando...';
-            
+
             try {
-                console.log(`Registrando asistente ${attendeeName} para evento ${currentEventId}...`);
-                
                 const attendeeData = {
                     name: attendeeName,
-                    timestamp: new Date().toISOString(),
-                    registered: firebase.firestore.FieldValue.serverTimestamp()
+                    timestamp: new Date().toISOString()
                 };
-                
+
                 // Verificar si ya está registrado
                 const eventDoc = await db.collection('events').doc(currentEventId).get();
                 const eventData = eventDoc.data();
                 
                 if (eventData.attendees && eventData.attendees.some(a => a.name.toLowerCase() === attendeeName.toLowerCase())) {
-                    resultDiv.innerHTML = `
-                        <div class="error-message">
-                            <h3>⚠️ Ya Registrado</h3>
-                            <p><strong>Nombre:</strong> ${attendeeName}</p>
-                            <p>Ya tienes un registro para este evento.</p>
-                        </div>
-                    `;
-                    resultDiv.style.display = 'block';
-                    return;
+                    showResult('registrationResult', false, 'Ya estás registrado en este evento');
+                } else {
+                    await db.collection('events').doc(currentEventId).update({
+                        attendees: firebase.firestore.FieldValue.arrayUnion(attendeeData)
+                    });
+                    
+                    showResult('registrationResult', true, `¡Registro exitoso!<br>Bienvenido ${attendeeName}`);
+                    
+                    setTimeout(() => {
+                        showPage('homePage');
+                        currentEventId = null;
+                    }, 3000);
                 }
-                
-                // Agregar asistente
-                await db.collection('events').doc(currentEventId).update({
-                    attendees: firebase.firestore.FieldValue.arrayUnion(attendeeData)
-                });
-                
-                console.log(`✅ Asistente ${attendeeName} registrado exitosamente`);
-                
-                resultDiv.innerHTML = `
-                    <div class="success-message">
-                        <h3>🎉 ¡Registro Exitoso!</h3>
-                        <p><strong>👤 Nombre:</strong> ${attendeeName}</p>
-                        <p><strong>📅 Evento:</strong> ${eventData.name}</p>
-                        <p><strong>⏰ Registrado:</strong> ${new Date().toLocaleString()}</p>
-                        <p>🎯 ¡Bienvenido al evento! No olvides asistir.</p>
-                    </div>
-                `;
-                resultDiv.style.display = 'block';
-                
-                document.getElementById('attendeeName').value = '';
-                
-                setTimeout(() => {
-                    showPage('homePage');
-                    currentEventId = null;
-                    document.getElementById('scanResult').style.display = 'none';
-                }, 4000);
-                
+
             } catch (error) {
-                console.error('❌ Error registrando asistente:', error);
-                resultDiv.innerHTML = `
-                    <div class="error-message">
-                        <h3>❌ Error en el Registro</h3>
-                        <p>No se pudo completar el registro.</p>
-                        <p><strong>Error:</strong> ${error.message}</p>
-                        <p>Por favor, inténtalo de nuevo.</p>
-                    </div>
-                `;
-                resultDiv.style.display = 'block';
-            } finally {
-                registerBtn.disabled = false;
-                registerBtn.textContent = 'Confirmar Asistencia';
+                showResult('registrationResult', false, 'Error en el registro: ' + error.message);
             }
+
+            registerBtn.disabled = false;
+            registerBtn.textContent = 'Confirmar Asistencia';
         }
 
-        // Función para crear eventos de prueba
-        async function createTestEvents() {
-            if (!isFirebaseConnected || !isLoggedIn) return;
-            
-            const testEvents = [
-                {
-                    id: 'test-' + Date.now() + '-1',
-                    name: 'Reunión de Equipo Semanal',
-                    day: 1, // Lunes
-                    time: '09:00',
-                    location: 'Sala de Conferencias A',
-                    created: firebase.firestore.FieldValue.serverTimestamp(),
-                    attendees: []
-                },
-                {
-                    id: 'test-' + Date.now() + '-2',
-                    name: 'Clase de Yoga Matutina',
-                    day: 3, // Miércoles
-                    time: '07:30',
-                    location: 'Gimnasio Principal',
-                    created: firebase.firestore.FieldValue.serverTimestamp(),
-                    attendees: []
-                },
-                {
-                    id: 'test-' + Date.now() + '-3',
-                    name: 'Taller de Programación',
-                    day: 5, // Viernes
-                    time: '15:00',
-                    location: 'Laboratorio de Computación',
-                    created: firebase.firestore.FieldValue.serverTimestamp(),
-                    attendees: []
-                }
-            ];
-            
-            try {
-                console.log('Creando eventos de prueba...');
-                
-                for (const event of testEvents) {
-                    await db.collection('events').doc(event.id).set(event);
-                    console.log(`✅ Evento de prueba creado: ${event.name}`);
-                }
-                
-                alert('✅ Eventos de prueba creados exitosamente!');
-                loadEvents();
-                
-            } catch (error) {
-                console.error('❌ Error creando eventos de prueba:', error);
-                alert(`Error creando eventos de prueba: ${error.message}`);
-            }
+        // Función auxiliar para mostrar resultados
+        function showResult(divId, success, message) {
+            const div = document.getElementById(divId);
+            div.className = success ? 'success-message' : 'error-message';
+            div.innerHTML = message;
+            div.style.display = 'block';
         }
 
-        // Función para limpiar todos los eventos (solo para testing)
-        async function clearAllEvents() {
-            if (!isFirebaseConnected || !isLoggedIn) return;
-            
-            if (!confirm('⚠️ ¿Estás seguro de eliminar TODOS los eventos? Esta acción no se puede deshacer.')) {
-                return;
-            }
-            
-            try {
-                console.log('Eliminando todos los eventos...');
-                
-                const snapshot = await db.collection('events').get();
-                const batch = db.batch();
-                
-                snapshot.docs.forEach(doc => {
-                    batch.delete(doc.ref);
-                });
-                
-                await batch.commit();
-                
-                console.log('✅ Todos los eventos eliminados');
-                alert('✅ Todos los eventos han sido eliminados');
-                loadEvents();
-                
-            } catch (error) {
-                console.error('❌ Error eliminando eventos:', error);
-                alert(`Error eliminando eventos: ${error.message}`);
-            }
-        }
-
-        // Inicialización de la aplicación
-        window.onload = async function() {
-            console.log('🚀 Iniciando Sistema de Registro de Eventos...');
-            
-            // Verificar dependencias
-            if (typeof firebase === 'undefined') {
-                console.error('❌ Firebase SDK no cargado');
-                updateConnectionStatus(false);
-                return;
-            }
-            
-            // Verificar QRCode con un pequeño retraso para permitir carga
-            setTimeout(() => {
-                checkQRCodeAvailability();
-                if (!qrCodeLibLoaded) {
-                    console.warn('⚠️ QRCode library no disponible, intentando cargar fallback...');
-                    loadQRCodeFallback();
-                }
-            }, 100);
-            
-            console.log('✅ Dependencias verificadas');
-            
-            // Inicializar Firebase
-            await initializeFirebase();
-            
-            // Agregar botones de utilidad para testing (solo en modo desarrollo)
-            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                console.log('🔧 Modo desarrollo detectado');
-                
-                // Agregar botones de utilidad al panel de organizador
-                const organizerPanel = document.getElementById('organizerPanel');
-                const utilityButtons = document.createElement('div');
-                utilityButtons.innerHTML = `
-                    <hr style="margin: 2rem 0;">
-                    <h3 style="color: #666; margin-bottom: 1rem;">🔧 Utilidades de Desarrollo</h3>
-                    <button class="btn btn-secondary" onclick="createTestEvents()" style="margin: 0.25rem 0;">
-                        🧪 Crear Eventos de Prueba
-                    </button>
-                    <button class="btn btn-danger" onclick="clearAllEvents()" style="margin: 0.25rem 0;">
-                        🗑️ Limpiar Todos los Eventos
-                    </button>
-                    <button class="btn btn-primary" onclick="testQRGeneration()" style="margin: 0.25rem 0;">
-                        📱 Test Generación QR
-                    </button>
-                `;
-                organizerPanel.appendChild(utilityButtons);
-            }
-            
-            // Agregar listeners para debugging
-            window.addEventListener('error', (event) => {
-                console.error('❌ Error global:', event.error);
-            });
-            
-            window.addEventListener('unhandledrejection', (event) => {
-                console.error('❌ Promise rechazada:', event.reason);
-            });
-            
-            console.log('✅ Sistema inicializado correctamente');
-            
-            // Mostrar información de estado
-            setTimeout(() => {
-                console.log(`📊 Estado del sistema:
-- Firebase conectado: ${isFirebaseConnected ? '✅' : '❌'}
-- QRCode disponible: ${qrCodeLibLoaded ? '✅' : '❌'}
-- Usuario logueado: ${isLoggedIn ? '✅' : '❌'}`);
-            }, 2000);
-        };
-
-        // Función de test para QR
-        function testQRGeneration() {
-            const testId = 'test-qr-' + Date.now();
-            const testContainer = document.createElement('div');
-            testContainer.id = `qr-${testId}`;
-            testContainer.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 9999;';
-            
-            testContainer.innerHTML = `
-                <h3>🧪 Test de Generación QR</h3>
-                <div id="qr-${testId}" style="text-align: center; margin: 1rem 0;"></div>
-                <button onclick="this.parentElement.remove()" style="background: #dc3545; color: white; border: none; padding: 0.5rem 1rem; border-radius: 5px; cursor: pointer;">Cerrar</button>
-            `;
-            
-            document.body.appendChild(testContainer);
-            generateQRCode(testId);
-        }
-
-        // Exponer funciones globales para debugging
-        window.EventRegSystem = {
-            initializeFirebase,
-            createTestEvents,
-            clearAllEvents,
-            loadEvents,
-            generateQRCode,
-            checkQRCodeAvailability,
-            loadQRCodeFallback,
-            testQRGeneration,
-            isFirebaseConnected: () => isFirebaseConnected,
-            isQRCodeLoaded: () => qrCodeLibLoaded,
-            getDB: () => db
+        // Inicialización
+        window.onload = function() {
+            console.log('Iniciando aplicación...');
+            initFirebase();
         };
     </script>
 </body>
