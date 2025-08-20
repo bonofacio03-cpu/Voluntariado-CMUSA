@@ -265,7 +265,7 @@
                 <p>Organizador</p>
             </div>
             
-            <form id="loginForm">
+            <div id="loginFormDiv">
                 <div class="form-group">
                     <label for="username">Usuario:</label>
                     <input type="text" id="username" required>
@@ -276,8 +276,8 @@
                     <input type="password" id="password" required>
                 </div>
                 
-                <button type="submit" class="btn btn-primary" id="loginBtn">Entrar</button>
-            </form>
+                <button type="button" class="btn btn-primary" id="loginBtn" onclick="handleLogin()">Entrar</button>
+            </div>
             
             <div id="loginError" class="error-message" style="display: none;"></div>
         </div>
@@ -304,7 +304,7 @@
             
             <h1>Crear Evento</h1>
             
-            <form id="createEventForm">
+            <div id="createEventForm">
                 <div class="form-group">
                     <label for="eventName">Nombre del Evento:</label>
                     <input type="text" id="eventName" required>
@@ -334,8 +334,8 @@
                     <input type="text" id="eventLocation" required>
                 </div>
                 
-                <button type="submit" class="btn btn-success" id="createEventBtn">Crear Evento</button>
-            </form>
+                <button type="button" class="btn btn-success" id="createEventBtn" onclick="handleCreateEvent()">Crear Evento</button>
+            </div>
             
             <div id="createEventSuccess" class="success-message" style="display: none;"></div>
             <div id="createEventError" class="error-message" style="display: none;"></div>
@@ -399,7 +399,6 @@
         };
 
 
-
         // Inicializar Firebase
         let db;
         let isFirebaseConnected = false;
@@ -453,12 +452,15 @@
             }
         }
 
-        function login(event) {
-            event.preventDefault();
-            
+        function handleLogin() {
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             const loginBtn = document.getElementById('loginBtn');
+            
+            if (!username || !password) {
+                showMessage('loginError', 'Por favor completa todos los campos', 'error');
+                return;
+            }
             
             loginBtn.disabled = true;
             loginBtn.textContent = 'Verificando...';
@@ -481,14 +483,33 @@
             }, 1000);
         }
 
+        function handleCreateEvent() {
+            if (!isLoggedIn) return;
+            
+            const eventName = document.getElementById('eventName').value;
+            const eventDay = document.getElementById('eventDay').value;
+            const eventTime = document.getElementById('eventTime').value;
+            const eventLocation = document.getElementById('eventLocation').value;
+            
+            if (!eventName || !eventDay || !eventTime || !eventLocation) {
+                showMessage('createEventError', 'Por favor completa todos los campos', 'error');
+                return;
+            }
+            
+            createEvent();
+        }
+
+        function login(event) {
+            // Esta función ya no se usa, mantenida por compatibilidad
+            handleLogin();
+        }
+
         function logout() {
             isLoggedIn = false;
             showPage('homePage');
         }
 
-        async function createEvent(event) {
-            event.preventDefault();
-            
+        async function createEvent() {
             if (!isLoggedIn) return;
             
             const createBtn = document.getElementById('createEventBtn');
@@ -519,8 +540,11 @@
                 showMessage('createEventSuccess', '¡Evento creado exitosamente!', 'success');
                 hideMessage('createEventError');
                 
-                // Limpiar formulario
-                document.getElementById('createEventForm').reset();
+                // Limpiar campos
+                document.getElementById('eventName').value = '';
+                document.getElementById('eventDay').value = '';
+                document.getElementById('eventTime').value = '';
+                document.getElementById('eventLocation').value = '';
                 
                 setTimeout(() => {
                     hideMessage('createEventSuccess');
@@ -711,24 +735,6 @@
 
         // Inicialización
         window.onload = function() {
-            // Configurar event listeners
-            const loginForm = document.getElementById('loginForm');
-            const createEventForm = document.getElementById('createEventForm');
-            
-            if (loginForm) {
-                loginForm.addEventListener('submit', function(e) {
-                    e.preventDefault();
-                    login(e);
-                });
-            }
-            
-            if (createEventForm) {
-                createEventForm.addEventListener('submit', function(e) {
-                    e.preventDefault();
-                    createEvent(e);
-                });
-            }
-            
             if (isFirebaseConnected) {
                 showMessage('connectionStatus', '✅ Conectado con Firebase', 'success');
                 setTimeout(() => hideMessage('connectionStatus'), 2000);
