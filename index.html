@@ -265,7 +265,7 @@
                 <p>Organizador</p>
             </div>
             
-            <form onsubmit="login(event)">
+            <form id="loginForm">
                 <div class="form-group">
                     <label for="username">Usuario:</label>
                     <input type="text" id="username" required>
@@ -304,7 +304,7 @@
             
             <h1>Crear Evento</h1>
             
-            <form onsubmit="createEvent(event)">
+            <form id="createEventForm">
                 <div class="form-group">
                     <label for="eventName">Nombre del Evento:</label>
                     <input type="text" id="eventName" required>
@@ -397,6 +397,7 @@
           appId: "1:796860746526:web:23da420b6e911c166b170f",
           measurementId: "G-8MKXQET4K0"
         };
+
 
 
         // Inicializar Firebase
@@ -519,7 +520,7 @@
                 hideMessage('createEventError');
                 
                 // Limpiar formulario
-                document.querySelector('#createEventPage form').reset();
+                document.getElementById('createEventForm').reset();
                 
                 setTimeout(() => {
                     hideMessage('createEventSuccess');
@@ -710,6 +711,24 @@
 
         // Inicialización
         window.onload = function() {
+            // Configurar event listeners
+            const loginForm = document.getElementById('loginForm');
+            const createEventForm = document.getElementById('createEventForm');
+            
+            if (loginForm) {
+                loginForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    login(e);
+                });
+            }
+            
+            if (createEventForm) {
+                createEventForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    createEvent(e);
+                });
+            }
+            
             if (isFirebaseConnected) {
                 showMessage('connectionStatus', '✅ Conectado con Firebase', 'success');
                 setTimeout(() => hideMessage('connectionStatus'), 2000);
@@ -740,4 +759,3 @@
     </script>
 </body>
 </html>
-
