@@ -1,162 +1,369 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Gestión de Eventos</title>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EventReg — Login Rápido + QR + CSV (FIX)</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:Arial,Helvetica,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;display:flex;align-items:center;justify-content:center}
+    .container{background:#fff;border-radius:20px;box-shadow:0 15px 35px rgba(0,0,0,.1);padding:2rem;width:90%;max-width:800px;margin:1rem;max-height:90vh;overflow-y:auto}
+    .logo{text-align:center;margin-bottom:1.5rem}
+    .logo h1{color:#667eea;font-size:2rem;margin-bottom:.4rem}
+    .logo p{color:#666;font-size:.95rem}
+    .page{display:none}
+    .page.active{display:block}
+    .btn{width:100%;padding:1rem;border:none;border-radius:10px;font-size:1.05rem;cursor:pointer;margin:.5rem 0;transition:all .3s ease}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .btn-primary{background:#667eea;color:#fff}
+    .btn-primary:hover:not(:disabled){background:#5a6fd8;transform:translateY(-2px)}
+    .btn-secondary{background:#764ba2;color:#fff}
+    .btn-secondary:hover:not(:disabled){background:#6a4190;transform:translateY(-2px)}
+    .btn-success{background:#28a745;color:#fff}
+    .btn-danger{background:#dc3545;color:#fff}
+    .btn-outline{background:transparent;border:2px solid #667eea;color:#667eea}
+    .form-group{margin-bottom:1rem}
+    label{display:block;margin-bottom:.4rem;color:#333;font-weight:700}
+    input,select{width:100%;padding:.8rem;border:2px solid #e0e0e0;border-radius:8px;font-size:1rem;transition:border-color .3s}
+    input:focus,select:focus{outline:none;border-color:#667eea}
+    .back-btn{background:#6c757d;color:#fff;padding:.5rem 1rem;border:none;border-radius:6px;cursor:pointer;margin-bottom:1rem}
+    .event-card{background:#f8f9fa;border:2px solid #e9ecef;border-radius:10px;padding:1rem;margin:1rem 0}
+    .event-card h3{color:#667eea;margin-bottom:.5rem}
+    .event-info{color:#666;font-size:.9rem;margin-bottom:1rem;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.4rem .8rem}
+    .grid-span-2{grid-column:span 2}
+    .qr-display{display:grid;grid-template-columns:128px 1fr;gap:1rem;align-items:center;background:#fff;border:2px dashed #dee2e6;border-radius:8px;padding:1rem}
+    .success-message{background:#d4edda;color:#155724;padding:1rem;border-radius:8px;margin:1rem 0;text-align:center}
+    .error-message{background:#f8d7da;color:#721c24;padding:1rem;border-radius:8px;margin:1rem 0;text-align:center}
+    .loading{text-align:center;color:#667eea;font-size:1.05rem;padding:1rem}
+    .attendee-form{background:#e3f2fd;padding:1rem;border-radius:10px;margin:1rem 0}
+    .attendee-list{max-height:220px;overflow-y:auto;background:#f8f9fa;border-radius:8px;padding:.8rem;margin:.6rem 0}
+    .attendee-item{padding:.4rem 0;border-bottom:1px solid #dee2e6;font-size:.92rem}
+    .attendee-item:last-child{border-bottom:none}
+    .status{position:fixed;top:10px;right:10px;padding:.5rem 1rem;border-radius:5px;font-size:.8rem;z-index:1000}
+    .status.connected{background:#d4edda;color:#155724}
+    .status.disconnected{background:#f8d7da;color:#721c24}
+    @media (max-width:600px){.container{width:95%;padding:1.2rem}.event-info{grid-template-columns:1fr}.qr-display{grid-template-columns:1fr}}
+  </style>
 </head>
 <body>
-  <h1>Gestión de Eventos</h1>
+  <div id="status" class="status disconnected">🟡 Conectando…</div>
 
-  <div id="loginSection">
-    <h2>Iniciar Sesión (Organizador)</h2>
-    <input type="text" id="username" placeholder="Usuario">
-    <input type="password" id="password" placeholder="Contraseña">
-    <button id="loginBtn">Entrar</button>
-    <p id="status">🔴 Sin conexión</p>
+  <div class="container">
+    <!-- Home -->
+    <div id="homePage" class="page active">
+      <div class="logo">
+        <h1>📅 EventReg</h1>
+        <p>Login rápido (sin Auth), QR real y exportación CSV</p>
+      </div>
+      <button class="btn btn-primary" id="goOrganizer">👨‍💼 Acceso Organizador</button>
+      <button class="btn btn-secondary" id="goAttendee">👥 Soy Asistente</button>
+    </div>
+
+    <!-- Login Organizador (hardcoded) -->
+    <div id="loginPage" class="page">
+      <button class="back-btn" data-target="homePage">← Volver</button>
+      <div class="logo"><h1>Iniciar Sesión</h1><p>Organizador</p></div>
+      <form id="loginForm">
+        <div class="form-group"><label for="username">Usuario:</label><input type="text" id="username" value="admin" required /></div>
+        <div class="form-group"><label for="password">Contraseña:</label><input type="password" id="password" value="123456" required /></div>
+        <button type="submit" class="btn btn-primary">Entrar</button>
+      </form>
+      <div id="loginError" class="error-message" style="display:none;"></div>
+    </div>
+
+    <!-- Panel Organizador -->
+    <div id="organizerPanel" class="page">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <h1>Panel Organizador</h1>
+        <button class="back-btn" id="logoutBtn">Cerrar Sesión</button>
+      </div>
+      <button class="btn btn-primary" data-target="createEventPage">➕ Crear Evento</button>
+      <button class="btn btn-secondary" data-target="viewEventsPage">📋 Ver Eventos</button>
+    </div>
+
+    <!-- Crear Evento -->
+    <div id="createEventPage" class="page">
+      <button class="back-btn" data-target="organizerPanel">← Volver</button>
+      <h1>Crear Evento</h1>
+      <form id="createEventForm">
+        <div class="form-group"><label for="eventName">Nombre del Evento:</label><input type="text" id="eventName" required /></div>
+        <div class="form-group"><label for="eventDay">Día de la Semana:</label>
+          <select id="eventDay" required>
+            <option value="">Seleccionar día</option>
+            <option value="1">Lunes</option>
+            <option value="2">Martes</option>
+            <option value="3">Miércoles</option>
+            <option value="4">Jueves</option>
+            <option value="5">Viernes</option>
+            <option value="6">Sábado</option>
+            <option value="0">Domingo</option>
+          </select>
+        </div>
+        <div class="form-group"><label for="eventTime">Hora:</label><input type="time" id="eventTime" required /></div>
+        <div class="form-group"><label for="eventLocation">Ubicación:</label><input type="text" id="eventLocation" required /></div>
+        <button type="submit" class="btn btn-success" id="createBtn">Crear Evento</button>
+      </form>
+      <div id="createResult" style="display:none;"></div>
+    </div>
+
+    <!-- Ver Eventos -->
+    <div id="viewEventsPage" class="page">
+      <button class="back-btn" data-target="organizerPanel">← Volver</button>
+      <h1>Eventos Programados</h1>
+      <div id="eventsList" class="loading">Cargando eventos...</div>
+    </div>
+
+    <!-- Página Asistente -->
+    <div id="attendeePage" class="page">
+      <button class="back-btn" data-target="homePage">← Volver</button>
+      <div class="logo"><h1>Registro de Asistente</h1><p>Escanea el QR o ingresa el código del evento</p></div>
+      <form id="eventCodeForm">
+        <div class="form-group"><label for="eventCode">Código del Evento:</label><input type="text" id="eventCode" required placeholder="Ingresa el código del evento" /></div>
+        <button type="submit" class="btn btn-primary">Buscar Evento</button>
+      </form>
+      <div id="eventCodeResult" style="display:none;"></div>
+    </div>
+
+    <!-- Formulario de Registro de Asistente -->
+    <div id="attendeeFormPage" class="page">
+      <button class="back-btn" data-target="attendeePage">← Volver</button>
+      <div class="logo"><h1>Registro de Asistencia</h1></div>
+      <div id="eventDetails" class="attendee-form"></div>
+      <form id="attendeeRegisterForm">
+        <div class="form-group"><label for="attendeeName">Tu nombre completo:</label><input type="text" id="attendeeName" required placeholder="Ingresa tu nombre y apellido" /></div>
+        <button type="submit" class="btn btn-success" id="registerBtn">Confirmar Asistencia</button>
+      </form>
+      <div id="registrationResult" style="display:none;"></div>
+    </div>
   </div>
 
-  <div id="organizerSection" style="display:none;">
-    <h2>Crear Evento</h2>
-    <form id="createEventForm">
-      <input type="text" id="eventName" placeholder="Nombre del evento" required>
-      <input type="date" id="eventDate" required>
-      <button type="submit">Crear Evento</button>
-    </form>
-
-    <h2>Eventos</h2>
-    <ul id="eventsList"></ul>
-  </div>
-
-  <div id="assistantSection">
-    <h2>Unirse a Evento</h2>
-    <input type="text" id="eventCode" placeholder="Código del evento">
-    <input type="text" id="assistantName" placeholder="Tu nombre">
-    <button id="joinBtn">Unirme</button>
-  </div>
+  <!-- Librerías -->
+  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
   <script>
-    // Configuración de Firebase
+    // ===== Configuración Firebase (tu proyecto ORIGINAL) =====
     const firebaseConfig = {
-      apiKey: "AIzaSyBCKYH6fFZIQI04FVpTm9CSU8jrf3dW0fI",
-      authDomain: "voluntariado-cmusa.firebaseapp.com",
-      projectId: "voluntariado-cmusa",
-      storageBucket: "voluntariado-cmusa.appspot.com",
-      messagingSenderId: "163763370924",
-      appId: "1:163763370924:web:cdcb268624e3b58e88dcfd"
+      apiKey: "AIzaSyBR1Pt67y9SZ7nwciiemMhfaAe-jO1wMaY",
+      authDomain: "voluntariadocmusa.firebaseapp.com",
+      projectId: "voluntariadocmusa",
+      storageBucket: "voluntariadocmusa.firebasestorage.app",
+      messagingSenderId: "796860746526",
+      appId: "1:796860746526:web:23da420b6e911c166b170f",
+      measurementId: "G-8MKXQET4K0"
     };
 
-    const app = firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+    // ===== Variables globales =====
+    let db; let isConnected = false; let isLoggedIn = false; let currentEventId = null;
+    const credentials = { username: 'admin', password: '123456' };
 
-    // Verificar conexión
-    db.collection("__test").get().then(() => {
-      document.getElementById("status").textContent = "🟢 Conectado";
-    }).catch(() => {
-      document.getElementById("status").textContent = "🔴 Sin conexión";
-    });
+    // ===== Inicializar Firebase =====
+    async function initFirebase(){
+      try{
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        // Test de conexión (si falla mostramos el mensaje real)
+        await db.collection('events').limit(1).get();
+        isConnected = true; updateStatus(true);
+      }catch(err){ console.error('Error Firebase:', err); isConnected = false; updateStatus(false, err.message); }
+    }
 
-    // Login rápido
-    document.getElementById("loginBtn").addEventListener("click", () => {
-      const user = document.getElementById("username").value;
-      const pass = document.getElementById("password").value;
-      if(user === "admin" && pass === "123456") {
-        document.getElementById("organizerSection").style.display = "block";
-        document.getElementById("loginSection").style.display = "none";
-        // Ocultar estado al iniciar sesión
-        document.getElementById("status").style.display = "none";
-      } else {
-        alert("Credenciales inválidas");
-      }
-    });
+    function updateStatus(connected, msg){
+      const el = document.getElementById('status');
+      el.className = connected ? 'status connected' : 'status disconnected';
+      el.textContent = connected ? '🟢 Conectado' : `🔴 Sin conexión${msg ? ' — ' + msg : ''}`;
+    }
 
-    // Crear evento
-    document.getElementById("createEventForm").addEventListener("submit", async (e) => {
+    // ===== Navegación =====
+    function showPage(id){
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      if (id === 'viewEventsPage') loadEvents();
+    }
+
+    document.getElementById('goOrganizer').addEventListener('click', () => showPage('loginPage'));
+    document.getElementById('goAttendee').addEventListener('click', () => showPage('attendeePage'));
+    document.querySelectorAll('.back-btn').forEach(btn => btn.addEventListener('click', (e)=>{
+      const target = e.currentTarget.getAttribute('data-target');
+      if (target) showPage(target);
+    }));
+
+    // ===== Auth (rápida, sin Firebase Auth) =====
+    document.getElementById('loginForm').addEventListener('submit', (e)=>{
       e.preventDefault();
-      const name = document.getElementById("eventName").value;
-      const date = document.getElementById("eventDate").value;
-      try {
-        const docRef = await db.collection("events").add({
-          name,
-          date,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        alert("Evento creado con código: " + docRef.id);
-        document.getElementById("createEventForm").reset();
-        loadEvents();
-      } catch (err) {
-        console.error("Error creando evento:", err);
+      const u = document.getElementById('username').value; const p = document.getElementById('password').value;
+      if (u === credentials.username && p === credentials.password){
+        isLoggedIn = true; document.getElementById('loginError').style.display='none'; showPage('organizerPanel');
+        // Ocultamos el indicador de conexión tras login
+        const statusEl = document.getElementById('status'); if (statusEl) statusEl.style.display = 'none';
+      } else {
+        const div = document.getElementById('loginError'); div.textContent = 'Credenciales incorrectas'; div.style.display='block';
       }
     });
+    document.getElementById('logoutBtn').addEventListener('click', ()=>{ isLoggedIn = false; const statusEl = document.getElementById('status'); if (statusEl) statusEl.style.display=''; showPage('homePage'); });
 
-    // Cargar eventos
-    async function loadEvents() {
-      const list = document.getElementById("eventsList");
-      list.innerHTML = "";
-      const snapshot = await db.collection("events").orderBy("createdAt", "desc").get();
-      snapshot.forEach(doc => {
-        const li = document.createElement("li");
-        const data = doc.data();
-        li.innerHTML = `<b>${data.name}</b> (${data.date})<br>
-          Código: ${doc.id}<br>
-          <div id="qrcode-${doc.id}"></div>
-          <button onclick="exportCSV('${doc.id}')">Exportar CSV</button>
-          <button onclick="deleteEvent('${doc.id}')">Eliminar</button>`;
-        list.appendChild(li);
-        new QRCode(document.getElementById("qrcode-" + doc.id), {
-          text: doc.id,
-          width: 100,
-          height: 100
-        });
-      });
+    // ===== Crear evento =====
+    document.getElementById('createEventForm').addEventListener('submit', createEvent);
+    async function createEvent(e){
+      e.preventDefault(); const btn = document.getElementById('createBtn'); const resultDiv = document.getElementById('createResult');
+      btn.disabled = true; btn.textContent = 'Creando...'; resultDiv.style.display = 'none';
+      if (!isLoggedIn){ showResult('createResult', false, 'Debes iniciar sesión como organizador'); btn.disabled=false; btn.textContent='Crear Evento'; return; }
+      if (!isConnected){ showResult('createResult', false, 'No hay conexión a Firebase'); btn.disabled=false; btn.textContent='Crear Evento'; return; }
+      try{
+        const id = Date.now().toString();
+        const data = {
+          id,
+          name: document.getElementById('eventName').value.trim(),
+          day: parseInt(document.getElementById('eventDay').value),
+          time: document.getElementById('eventTime').value,
+          location: document.getElementById('eventLocation').value.trim(),
+          created: new Date(),
+          attendees: []
+        };
+        await db.collection('events').doc(id).set(data);
+        showResult('createResult', true, `Evento "${data.name}" creado. Código: ${id}`);
+        document.getElementById('createEventForm').reset();
+        setTimeout(()=>showPage('viewEventsPage'), 800);
+      }catch(err){ console.error(err); showResult('createResult', false, 'Error al crear: '+ err.message); }
+      btn.disabled = false; btn.textContent = 'Crear Evento';
     }
 
-    // Unirse a evento
-    document.getElementById("joinBtn").addEventListener("click", async () => {
-      const code = document.getElementById("eventCode").value;
-      const name = document.getElementById("assistantName").value;
-      if(!code || !name) return alert("Completa todos los campos");
-      try {
-        await db.collection("events").doc(code).collection("attendees").add({
-          name,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        alert("Registrado en el evento");
-      } catch (err) {
-        alert("Código inválido");
-      }
-    });
-
-    // Exportar CSV
-    async function exportCSV(eventId) {
-      const snapshot = await db.collection("events").doc(eventId).collection("attendees").get();
-      let csv = "Nombre,Fecha\n";
-      snapshot.forEach(doc => {
-        const d = doc.data();
-        csv += `${d.name},${d.createdAt ? d.createdAt.toDate().toLocaleString() : ""}\n`;
-      });
-      const blob = new Blob([csv], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `asistentes-${eventId}.csv`;
-      a.click();
+    // ===== Cargar eventos (con QR y CSV) =====
+    async function loadEvents(){
+      const list = document.getElementById('eventsList'); list.innerHTML = '<div class="loading">Cargando eventos...</div>';
+      if (!isConnected){ list.innerHTML = '<div class="error-message">No hay conexión a Firebase</div>'; return; }
+      try{
+        const snap = await db.collection('events').orderBy('created','desc').get();
+        if (snap.empty){ list.innerHTML = '<div style="text-align:center;padding:2rem;"><h3>No hay eventos</h3><p>Crea tu primer evento</p></div>'; return; }
+        const days = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+        list.innerHTML = '';
+        for (const doc of snap.docs){
+          const ev = doc.data(); const id = doc.id;
+          const card = document.createElement('div'); card.className = 'event-card';
+          const created = ev.created && ev.created.toDate ? ev.created.toDate() : new Date(ev.created);
+          card.innerHTML = `
+            <h3>${ev.name}</h3>
+            <div class="event-info">
+              <div><strong>Día:</strong> ${days[ev.day]} (semanal)</div>
+              <div><strong>Hora:</strong> ${ev.time}</div>
+              <div class="grid-span-2"><strong>Ubicación:</strong> ${ev.location}</div>
+              <div class="grid-span-2"><strong>Creado:</strong> ${created ? new Date(created).toLocaleString() : '—'}</div>
+            </div>
+            <div class="qr-display">
+              <div id="qrcode-${id}"></div>
+              <div>
+                <div style="font-weight:bold;color:#495057;">Código del Evento</div>
+                <div style="font-family:monospace;background:#fff;border:1px solid #dee2e6;padding:.6rem;border-radius:6px;word-break:break-all;">${id}</div>
+                <p style="color:#6c757d;margin-top:.4rem;">Escanea el QR o introduce el código.</p>
+                <div style="display:flex;gap:.5rem;margin-top:.6rem;flex-wrap:wrap;">
+                  <button class="btn btn-outline" onclick="exportCSV('${id}', '${ev.name.replace(/'/g, "\'")}')">📤 Exportar CSV</button>
+                  <button class="btn btn-danger" onclick="deleteEvent('${id}', '${ev.name.replace(/'/g, "\'")}')">🗑️ Eliminar</button>
+                </div>
+              </div>
+            </div>
+            <div class="attendee-list">${renderAttendees(ev.attendees || [])}</div>
+          `;
+          list.appendChild(card);
+          new QRCode(document.getElementById(`qrcode-${id}`), { text: id, width: 128, height: 128 });
+        }
+      }catch(err){ console.error(err); list.innerHTML = `<div class="error-message">Error al cargar eventos: ${err.message}</div>`; }
     }
 
-    // Eliminar evento
-    async function deleteEvent(eventId) {
-      if(!confirm("¿Eliminar evento y asistentes?")) return;
-      const attendees = await db.collection("events").doc(eventId).collection("attendees").get();
-      const batch = db.batch();
-      attendees.forEach(doc => batch.delete(doc.ref));
-      await batch.commit();
-      await db.collection("events").doc(eventId).delete();
-      loadEvents();
+    function renderAttendees(items){
+      if (!items || items.length === 0) return '<strong>Asistentes (0)</strong>';
+      const rows = items.map(a => `<div class="attendee-item">${escapeHtml(a.name)} — ${a.timestamp ? new Date(a.timestamp).toLocaleString() : ''}</div>`).join('');
+      return `<strong>Asistentes (${items.length}):</strong>${rows}`;
     }
 
-    loadEvents();
+    // ===== Exportar CSV (desde array attendees) =====
+    async function exportCSV(eventId, eventName){
+      try{
+        const doc = await db.collection('events').doc(eventId).get();
+        if (!doc.exists) return alert('Evento no encontrado');
+        const ev = doc.data();
+        const rows = [['Nombre','Fecha ISO']].concat((ev.attendees||[]).map(a => [a.name||'', a.timestamp? new Date(a.timestamp).toISOString() : '']));
+        const csv = rows.map(r => r.map(cell => `"${(cell||'').toString().replace(/"/g, '""')}"`).join(',')).join('
+');
+        const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+        const a = document.createElement('a'); const url = URL.createObjectURL(blob);
+        const fileSafe = eventName.replace(/[^a-z0-9-_]+/gi,'_');
+        a.href = url; a.download = `asistentes-${fileSafe}-${eventId}.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+      }catch(err){ alert('No se pudo exportar: ' + err.message); }
+    }
+
+    // ===== Eliminar evento =====
+    async function deleteEvent(eventId, eventName){
+      if (!confirm(`¿Eliminar el evento "${eventName}"?`)) return;
+      try{ await db.collection('events').doc(eventId).delete(); loadEvents(); }
+      catch(err){ alert('Error al eliminar: ' + err.message); }
+    }
+
+    // ===== Flujo Asistente =====
+    document.getElementById('eventCodeForm').addEventListener('submit', processEventCode);
+    async function processEventCode(e){
+      e.preventDefault();
+      const eventCode = document.getElementById('eventCode').value.trim();
+      const resultDiv = document.getElementById('eventCodeResult');
+      if (!isConnected){ showResult('eventCodeResult', false, 'No hay conexión a Firebase'); return; }
+      resultDiv.innerHTML = '<div class="loading">Buscando evento...</div>'; resultDiv.style.display = 'block';
+      try{
+        const doc = await db.collection('events').doc(eventCode).get();
+        if (!doc.exists){ showResult('eventCodeResult', false, 'Evento no encontrado'); return; }
+        const ev = doc.data(); currentEventId = eventCode;
+        const now = new Date(); const day = now.getDay();
+        const currentMin = now.getHours()*60 + now.getMinutes();
+        const [h, m] = ev.time.split(':').map(n=>parseInt(n,10));
+        const eventMin = h*60 + m; const diff = Math.abs(currentMin - eventMin);
+        if (day !== ev.day || diff > 60){
+          const days = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+          showResult('eventCodeResult', false, `Evento: ${ev.name}<br>Día: ${days[ev.day]} a las ${ev.time}<br>Solo puedes registrarte 1 hora antes del evento y el día correcto.`);
+          return;
+        }
+        showAttendeeForm(ev);
+      }catch(err){ showResult('eventCodeResult', false, 'Error: ' + err.message); }
+    }
+
+    function showAttendeeForm(ev){
+      const days = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+      document.getElementById('eventDetails').innerHTML = `
+        <h3>✅ Evento Válido</h3>
+        <p><strong>Evento:</strong> ${ev.name}</p>
+        <p><strong>Ubicación:</strong> ${ev.location}</p>
+        <p><strong>Día:</strong> ${days[ev.day]}</p>
+        <p><strong>Hora:</strong> ${ev.time}</p>
+      `;
+      document.getElementById('attendeeName').value = '';
+      document.getElementById('registrationResult').style.display = 'none';
+      showPage('attendeeFormPage');
+    }
+
+    document.getElementById('attendeeRegisterForm').addEventListener('submit', registerAttendee);
+    async function registerAttendee(e){
+      e.preventDefault(); const btn = document.getElementById('registerBtn'); const name = document.getElementById('attendeeName').value.trim();
+      btn.disabled = true; btn.textContent = 'Registrando...';
+      try{
+        const docRef = db.collection('events').doc(currentEventId);
+        const doc = await docRef.get(); if (!doc.exists) throw new Error('Evento no encontrado');
+        const ev = doc.data(); const attendees = Array.isArray(ev.attendees) ? ev.attendees : [];
+        const already = attendees.some(a => (a.name||'').toLowerCase() === name.toLowerCase());
+        if (already){ showResult('registrationResult', false, 'Ya estás registrado en este evento'); }
+        else {
+          const attendee = { name, timestamp: new Date().toISOString() };
+          await docRef.update({ attendees: firebase.firestore.FieldValue.arrayUnion(attendee) });
+          showResult('registrationResult', true, `¡Registro exitoso!<br>Bienvenido ${escapeHtml(name)}`);
+          setTimeout(()=>{ showPage('homePage'); currentEventId=null; }, 1500);
+        }
+      }catch(err){ showResult('registrationResult', false, 'Error en el registro: ' + err.message); }
+      btn.disabled = false; btn.textContent = 'Confirmar Asistencia';
+    }
+
+    // ===== Utilidades =====
+    function showResult(id, ok, msg){ const d = document.getElementById(id); d.className = ok ? 'success-message' : 'error-message'; d.innerHTML = msg; d.style.display = 'block'; }
+    function escapeHtml(str){ return (str||'').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
+
+    // ===== Start =====
+    window.onload = function(){ initFirebase(); };
   </script>
 </body>
 </html>
