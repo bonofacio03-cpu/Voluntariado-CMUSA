@@ -1,4 +1,53 @@
-<!DOCTYPE html>
+.qr-scanner {
+            text-align: center;
+            padding: 2rem 0;
+        }
+
+        .qr-input-form {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin: 1rem 0;
+        }
+
+        .qr-input-form h3 {
+            color: #667eea;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .qr-input-form .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .qr-input-form label {
+            color: #333;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .qr-input-form input {
+            width: 100%;
+            padding: 0.8rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .qr-input-form input:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .btn-group .btn {
+            flex: 1;
+        }<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -153,9 +202,26 @@
             font-size: 0.9rem;
         }
 
-        .qr-scanner {
+        .qr-code {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 1rem 0;
+            padding: 1rem;
+            background: white;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+        }
+
+        .qr-code canvas {
+            margin: 0.5rem 0;
+        }
+
+        .qr-info {
             text-align: center;
-            padding: 2rem 0;
+            color: #666;
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
         }
 
         .scanner-box {
@@ -376,6 +442,29 @@
                 </button>
             </div>
             
+            <div id="attendeeForm" class="qr-input-form" style="display: none;">
+                <h3>📝 Información del Asistente</h3>
+                <div class="form-group">
+                    <label for="attendeeName">Nombre completo:</label>
+                    <input type="text" id="attendeeName" placeholder="Ingresa tu nombre completo" required>
+                </div>
+                <div class="form-group">
+                    <label for="attendeeEmail">Email (opcional):</label>
+                    <input type="email" id="attendeeEmail" placeholder="tu@email.com">
+                </div>
+                <div id="eventInfo" style="margin: 1rem 0; padding: 1rem; background: #e3f2fd; border-radius: 8px; color: #0d47a1;">
+                    <!-- Información del evento escaneado -->
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-success" onclick="confirmAttendance()" id="confirmBtn">
+                        ✅ Confirmar Asistencia
+                    </button>
+                    <button class="btn btn-secondary" onclick="cancelAttendance()">
+                        ❌ Cancelar
+                    </button>
+                </div>
+            </div>
+            
             <div id="scanResult" style="display: none;"></div>
         </div>
     </div>
@@ -383,9 +472,12 @@
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <!-- QR Code Generator -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 
     <script>
         // ⚠️ CONFIGURACIÓN DE FIREBASE ⚠️
+// Import the functions you need from the SDKs you need
 
         const firebaseConfig = {
           apiKey: "AIzaSyBR1Pt67y9SZ7nwciiemMhfaAe-jO1wMaY",
@@ -397,7 +489,6 @@
           appId: "1:796860746526:web:23da420b6e911c166b170f",
           measurementId: "G-8MKXQET4K0"
         };
-
 
         // Inicializar Firebase
         let db;
@@ -609,14 +700,75 @@
                         <p><strong>📅 Día:</strong> ${daysOfWeek[event.day]} (semanal)</p>
                         <p><strong>⏰ Hora:</strong> ${event.time}</p>
                         <p><strong>📍 Ubicación:</strong> ${event.location}</p>
-                        <p><strong>🔗 QR ID:</strong> ${event.id}</p>
                         <p><strong>Creado:</strong> ${event.createdDate || new Date(event.created.toDate()).toLocaleString()}</p>
+                    </div>
+                    <div class="qr-code">
+                        <div id="qr-${event.id}"></div>
+                        <div class="qr-info">Código QR para registro</div>
                     </div>
                     <button class="btn btn-danger" onclick="deleteEvent('${event.id}')" style="margin-top: 1rem;">
                         🗑️ Eliminar
                     </button>
                 </div>
             `).join('');
+            
+            // Generar QR codes después de renderizar el HTML
+            setTimeout(() => {
+                events.forEach(event => {
+                    generateQRCode(event.id, event);
+                });
+            }, 100);
+        }
+
+        function generateQRCode(eventId, eventData) {
+            const qrContainer = document.getElementById(`qr-${eventId}`);
+            if (!qrContainer) return;
+            
+            // Crear datos del QR en formato JSON
+            const qrData = {
+                eventId: eventId,
+                eventName: eventData.name,
+                day: eventData.day,
+                time: eventData.time,
+                location: eventData.location
+            };
+            
+            try {
+                // Generar QR Code
+                const qr = qrcode(0, 'M');
+                qr.addData(JSON.stringify(qrData));
+                qr.make();
+                
+                // Crear elemento canvas para el QR
+                const qrSize = 150;
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                canvas.width = qrSize;
+                canvas.height = qrSize;
+                
+                const moduleCount = qr.getModuleCount();
+                const cellSize = qrSize / moduleCount;
+                
+                // Fondo blanco
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, qrSize, qrSize);
+                
+                // Dibujar módulos del QR
+                ctx.fillStyle = '#000000';
+                for (let row = 0; row < moduleCount; row++) {
+                    for (let col = 0; col < moduleCount; col++) {
+                        if (qr.isDark(row, col)) {
+                            ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+                        }
+                    }
+                }
+                
+                qrContainer.appendChild(canvas);
+            } catch (error) {
+                console.error('Error generando QR code:', error);
+                qrContainer.innerHTML = `<div class="error-message">Error generando QR</div>`;
+            }
         }
 
         async function deleteEvent(eventId) {
@@ -641,9 +793,12 @@
             }
         }
 
+        let currentScannedEvent = null;
+
         async function simulateQRScan() {
             const resultDiv = document.getElementById('scanResult');
             const scanBtn = document.getElementById('scanBtn');
+            const attendeeForm = document.getElementById('attendeeForm');
             
             scanBtn.disabled = true;
             scanBtn.textContent = 'Escaneando...';
@@ -680,30 +835,19 @@
                 const timeDiff = Math.abs(currentTime - eventTime);
                 
                 if (currentDay === randomEvent.day && timeDiff <= 60) {
-                    // Registro exitoso - podrías guardar esto en Firestore también
-                    if (isFirebaseConnected) {
-                        try {
-                            await db.collection('attendances').add({
-                                eventId: randomEvent.id,
-                                eventName: randomEvent.name,
-                                timestamp: firebase.firestore.Timestamp.now(),
-                                registeredAt: now.toLocaleString()
-                            });
-                            console.log("Asistencia registrada en Firestore");
-                        } catch (error) {
-                            console.error("Error registrando asistencia:", error);
-                        }
-                    }
+                    // Evento válido - mostrar formulario
+                    currentScannedEvent = randomEvent;
                     
-                    resultDiv.innerHTML = `
-                        <div class="success-message">
-                            <h3>✅ ¡Registro Exitoso!</h3>
-                            <p><strong>Evento:</strong> ${randomEvent.name}</p>
-                            <p><strong>Ubicación:</strong> ${randomEvent.location}</p>
-                            <p><strong>Hora:</strong> ${randomEvent.time}</p>
-                            <p><strong>Registrado:</strong> ${now.toLocaleString()}</p>
-                        </div>
+                    document.getElementById('eventInfo').innerHTML = `
+                        <h4>🎯 Evento: ${randomEvent.name}</h4>
+                        <p><strong>📍 Ubicación:</strong> ${randomEvent.location}</p>
+                        <p><strong>⏰ Hora:</strong> ${randomEvent.time}</p>
+                        <p><strong>📅 Día:</strong> ${daysOfWeek[randomEvent.day]}</p>
                     `;
+                    
+                    attendeeForm.style.display = 'block';
+                    document.getElementById('attendeeName').focus();
+                    
                 } else {
                     // Fuera del tiempo permitido
                     resultDiv.innerHTML = `
@@ -715,13 +859,12 @@
                             <p>Solo puedes registrarte 1 hora antes del inicio del evento y en el día correcto.</p>
                         </div>
                     `;
+                    resultDiv.style.display = 'block';
+                    
+                    setTimeout(() => {
+                        resultDiv.style.display = 'none';
+                    }, 5000);
                 }
-                
-                resultDiv.style.display = 'block';
-                
-                setTimeout(() => {
-                    resultDiv.style.display = 'none';
-                }, 5000);
                 
             } catch (error) {
                 console.error("Error en el escaneo QR:", error);
@@ -731,6 +874,81 @@
                 scanBtn.disabled = false;
                 scanBtn.textContent = '📷 Escanear QR';
             }
+        }
+
+        async function confirmAttendance() {
+            if (!currentScannedEvent) return;
+            
+            const attendeeName = document.getElementById('attendeeName').value.trim();
+            const attendeeEmail = document.getElementById('attendeeEmail').value.trim();
+            const confirmBtn = document.getElementById('confirmBtn');
+            const resultDiv = document.getElementById('scanResult');
+            
+            if (!attendeeName) {
+                alert('Por favor ingresa tu nombre completo');
+                document.getElementById('attendeeName').focus();
+                return;
+            }
+            
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = '⏳ Registrando...';
+            
+            try {
+                const now = new Date();
+                const attendanceData = {
+                    eventId: currentScannedEvent.id,
+                    eventName: currentScannedEvent.name,
+                    attendeeName: attendeeName,
+                    attendeeEmail: attendeeEmail || null,
+                    timestamp: isFirebaseConnected ? firebase.firestore.Timestamp.now() : null,
+                    registeredAt: now.toLocaleString(),
+                    location: currentScannedEvent.location,
+                    eventTime: currentScannedEvent.time
+                };
+                
+                if (isFirebaseConnected) {
+                    await db.collection('attendances').add(attendanceData);
+                    console.log("Asistencia registrada en Firestore");
+                }
+                
+                // Mostrar mensaje de éxito
+                resultDiv.innerHTML = `
+                    <div class="success-message">
+                        <h3>🎉 ¡Registro Exitoso!</h3>
+                        <p><strong>Asistente:</strong> ${attendeeName}</p>
+                        <p><strong>Evento:</strong> ${currentScannedEvent.name}</p>
+                        <p><strong>Ubicación:</strong> ${currentScannedEvent.location}</p>
+                        <p><strong>Hora:</strong> ${currentScannedEvent.time}</p>
+                        <p><strong>Registrado:</strong> ${now.toLocaleString()}</p>
+                        ${attendeeEmail ? `<p><strong>Email:</strong> ${attendeeEmail}</p>` : ''}
+                    </div>
+                `;
+                
+                // Limpiar formulario y ocultarlo
+                document.getElementById('attendeeName').value = '';
+                document.getElementById('attendeeEmail').value = '';
+                document.getElementById('attendeeForm').style.display = 'none';
+                resultDiv.style.display = 'block';
+                
+                setTimeout(() => {
+                    resultDiv.style.display = 'none';
+                    currentScannedEvent = null;
+                }, 6000);
+                
+            } catch (error) {
+                console.error("Error registrando asistencia:", error);
+                alert('Error al registrar la asistencia. Inténtalo de nuevo.');
+            } finally {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = '✅ Confirmar Asistencia';
+            }
+        }
+
+        function cancelAttendance() {
+            document.getElementById('attendeeForm').style.display = 'none';
+            document.getElementById('attendeeName').value = '';
+            document.getElementById('attendeeEmail').value = '';
+            currentScannedEvent = null;
         }
 
         // Inicialización
