@@ -612,6 +612,34 @@
         let currentScannedEvent = null;
         let isScanning = false;
 
+        // Función para verificar si jsQR está cargado
+        function checkJsQRLoaded() {
+            return new Promise((resolve) => {
+                if (typeof jsQR !== 'undefined') {
+                    console.log('✅ jsQR está cargado y disponible');
+                    resolve(true);
+                    return;
+                }
+                
+                console.log('⏳ Esperando que jsQR se cargue...');
+                let attempts = 0;
+                const maxAttempts = 50; // 5 segundos máximo
+                
+                const checkInterval = setInterval(() => {
+                    attempts++;
+                    if (typeof jsQR !== 'undefined') {
+                        console.log('✅ jsQR cargado exitosamente');
+                        clearInterval(checkInterval);
+                        resolve(true);
+                    } else if (attempts >= maxAttempts) {
+                        console.error('❌ jsQR no se pudo cargar después de 5 segundos');
+                        clearInterval(checkInterval);
+                        resolve(false);
+                    }
+                }, 100);
+            });
+        }
+
         // Funciones de utilidad
         function showMessage(elementId, message, type = 'info') {
             const element = document.getElementById(elementId);
@@ -667,7 +695,15 @@
             
             try {
                 startBtn.disabled = true;
-                startBtn.textContent = '⏳ Iniciando cámara...';
+                startBtn.textContent = '⏳ Verificando librerías...';
+                
+                // VERIFICAR QUE jsQR ESTÉ CARGADO
+                const jsQRLoaded = await checkJsQRLoaded();
+                if (!jsQRLoaded) {
+                    throw new Error('jsQR no está disponible. Recarga la página.');
+                }
+                
+                startBtn.textContent = '⏳ Cargando eventos...';
                 
                 // Asegurar que tenemos eventos cargados
                 console.log('📋 Verificando eventos disponibles...');
@@ -684,6 +720,7 @@
                     return;
                 }
                 
+                startBtn.textContent = '⏳ Iniciando cámara...';
                 console.log('📱 Solicitando acceso a cámara...');
                 
                 // Solicitar acceso a la cámara con múltiples configuraciones
@@ -768,7 +805,9 @@
                 console.error('💥 Error accediendo a la cámara:', error);
                 
                 let errorMessage = 'No se pudo acceder a la cámara.';
-                if (error.name === 'NotAllowedError') {
+                if (error.message.includes('jsQR')) {
+                    errorMessage = 'Error cargando la librería de escaneo QR. Recarga la página.';
+                } else if (error.name === 'NotAllowedError') {
                     errorMessage = 'Acceso a cámara denegado. Por favor permite el acceso en la configuración del navegador.';
                 } else if (error.name === 'NotFoundError') {
                     errorMessage = 'No se encontró cámara en el dispositivo.';
@@ -817,6 +856,15 @@
         function scanQRCode() {
             if (!isScanning) return;
             
+            // VERIFICAR QUE jsQR ESTÉ DISPONIBLE ANTES DE USARLO
+            if (typeof jsQR === 'undefined') {
+                console.error('❌ jsQR no está definido en scanQRCode()');
+                isScanning = false;
+                alert('Error: La librería jsQR no está cargada. Recarga la página.');
+                stopQRScanner();
+                return;
+            }
+            
             const video = document.getElementById('qr-video');
             
             // Verificar que el video esté listo
@@ -848,23 +896,28 @@
             // Intentar decodificar QR con diferentes configuraciones
             let code = null;
             
-            // Primer intento: configuración estándar
-            code = jsQR(imageData.data, imageData.width, imageData.height, {
-                inversionAttempts: "dontInvert"
-            });
-            
-            // Segundo intento: con inversión
-            if (!code) {
+            try {
+                // Primer intento: configuración estándar
                 code = jsQR(imageData.data, imageData.width, imageData.height, {
-                    inversionAttempts: "attemptBoth"
+                    inversionAttempts: "dontInvert"
                 });
-            }
-            
-            // Tercer intento: solo inversión
-            if (!code) {
-                code = jsQR(imageData.data, imageData.width, imageData.height, {
-                    inversionAttempts: "invertFirst"
-                });
+                
+                // Segundo intento: con inversión
+                if (!code) {
+                    code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: "attemptBoth"
+                    });
+                }
+                
+                // Tercer intento: solo inversión
+                if (!code) {
+                    code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: "invertFirst"
+                    });
+                }
+            } catch (jsqrError) {
+                console.error('❌ Error ejecutando jsQR:', jsqrError);
+                // Continuar sin detener el escaneo
             }
             
             if (code && code.data) {
@@ -1440,8 +1493,22 @@
             currentScannedEvent = null;
         }
 
-        // Inicialización
+        // Inicialización mejorada
         window.onload = function() {
+            console.log('🚀 Iniciando aplicación...');
+            
+            // Verificar disponibilidad de librerías
+            setTimeout(() => {
+                console.log('🔍 Verificando librerías cargadas...');
+                console.log('- Firebase:', typeof firebase !== 'undefined' ? '✅' : '❌');
+                console.log('- QRious:', typeof QRious !== 'undefined' ? '✅' : '❌');
+                console.log('- jsQR:', typeof jsQR !== 'undefined' ? '✅' : '❌');
+                
+                if (typeof jsQR === 'undefined') {
+                    console.warn('⚠️ jsQR no está cargado correctamente');
+                }
+            }, 2000);
+            
             if (isFirebaseConnected) {
                 showMessage('connectionStatus', '✅ Conectado con Firebase', 'success');
                 setTimeout(() => hideMessage('connectionStatus'), 2000);
