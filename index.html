@@ -432,13 +432,20 @@
                 <div class="scanner-box">
                     <div class="scanner-text">
                         📱<br>
-                        Presiona para escanear<br>
-                        código QR
+                        Simula escanear código QR<br>
+                        (Demo - selecciona un evento)
                     </div>
                 </div>
                 
+                <div class="form-group" style="margin: 1rem 0;">
+                    <label for="eventSelect">Selecciona un evento para simular escaneo:</label>
+                    <select id="eventSelect" style="width: 100%; padding: 0.8rem; border: 2px solid #e0e0e0; border-radius: 8px;">
+                        <option value="">-- Selecciona un evento --</option>
+                    </select>
+                </div>
+                
                 <button class="btn btn-primary" onclick="simulateQRScan()" id="scanBtn">
-                    📷 Escanear QR
+                    📷 Simular Escaneo QR
                 </button>
             </div>
             
@@ -473,22 +480,23 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <!-- QR Code Generator -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
 
     <script>
         // ⚠️ CONFIGURACIÓN DE FIREBASE ⚠️
-// Import the functions you need from the SDKs you need
+
 
         const firebaseConfig = {
-          apiKey: "AIzaSyBR1Pt67y9SZ7nwciiemMhfaAe-jO1wMaY",
-          authDomain: "voluntariadocmusa.firebaseapp.com",
-          databaseURL: "https://voluntariadocmusa-default-rtdb.europe-west1.firebasedatabase.app",
-          projectId: "voluntariadocmusa",
-          storageBucket: "voluntariadocmusa.firebasestorage.app",
-          messagingSenderId: "796860746526",
-          appId: "1:796860746526:web:23da420b6e911c166b170f",
-          measurementId: "G-8MKXQET4K0"
+            apiKey: "AIzaSyBR1Pt67y9SZ7nwciiemMhfaAe-jO1wMaY",
+            authDomain: "voluntariadocmusa.firebaseapp.com",
+            databaseURL: "https://voluntariadocmusa-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "voluntariadocmusa",
+            storageBucket: "voluntariadocmusa.firebasestorage.app",
+            messagingSenderId: "796860746526",
+            appId: "1:796860746526:web:23da420b6e911c166b170f",
+            measurementId: "G-8MKXQET4K0"
         };
+
 
         // Inicializar Firebase
         let db;
@@ -540,6 +548,53 @@
             // Cargar eventos si vamos a la página de ver eventos
             if (pageId === 'viewEventsPage') {
                 loadEvents();
+            }
+            
+            // Cargar eventos para selector si vamos a la página de asistente
+            if (pageId === 'attendeePage') {
+                loadEventsForSelector();
+            }
+        }
+
+        async function loadEventsForSelector() {
+            const eventSelect = document.getElementById('eventSelect');
+            
+            try {
+                // Cargar eventos desde Firestore si está conectado
+                if (isFirebaseConnected) {
+                    const querySnapshot = await db.collection('events').get();
+                    events = [];
+                    querySnapshot.forEach((doc) => {
+                        const data = doc.data();
+                        events.push({
+                            id: doc.id,
+                            ...data
+                        });
+                    });
+                }
+                
+                // Limpiar selector
+                eventSelect.innerHTML = '<option value="">-- Selecciona un evento --</option>';
+                
+                // Agregar eventos al selector
+                const daysOfWeek = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                events.forEach(event => {
+                    const option = document.createElement('option');
+                    option.value = event.id;
+                    option.textContent = `${event.name} - ${daysOfWeek[event.day]} ${event.time}`;
+                    eventSelect.appendChild(option);
+                });
+                
+                if (events.length === 0) {
+                    const option = document.createElement('option');
+                    option.value = '';
+                    option.textContent = 'No hay eventos disponibles';
+                    option.disabled = true;
+                    eventSelect.appendChild(option);
+                }
+                
+            } catch (error) {
+                console.error('Error cargando eventos para selector:', error);
             }
         }
 
@@ -724,50 +779,43 @@
             const qrContainer = document.getElementById(`qr-${eventId}`);
             if (!qrContainer) return;
             
+            // Limpiar contenedor anterior
+            qrContainer.innerHTML = '';
+            
             // Crear datos del QR en formato JSON
             const qrData = {
                 eventId: eventId,
                 eventName: eventData.name,
                 day: eventData.day,
                 time: eventData.time,
-                location: eventData.location
+                location: eventData.location,
+                type: 'event-qr'
             };
             
             try {
-                // Generar QR Code
-                const qr = qrcode(0, 'M');
-                qr.addData(JSON.stringify(qrData));
-                qr.make();
-                
-                // Crear elemento canvas para el QR
-                const qrSize = 150;
+                // Crear canvas para el QR
                 const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                
-                canvas.width = qrSize;
-                canvas.height = qrSize;
-                
-                const moduleCount = qr.getModuleCount();
-                const cellSize = qrSize / moduleCount;
-                
-                // Fondo blanco
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, qrSize, qrSize);
-                
-                // Dibujar módulos del QR
-                ctx.fillStyle = '#000000';
-                for (let row = 0; row < moduleCount; row++) {
-                    for (let col = 0; col < moduleCount; col++) {
-                        if (qr.isDark(row, col)) {
-                            ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
-                        }
-                    }
-                }
-                
                 qrContainer.appendChild(canvas);
+                
+                // Generar QR usando QRious
+                const qr = new QRious({
+                    element: canvas,
+                    value: JSON.stringify(qrData),
+                    size: 150,
+                    level: 'M',
+                    background: 'white',
+                    foreground: 'black'
+                });
+                
+                console.log(`QR generado para evento ${eventId}:`, qrData);
+                
             } catch (error) {
                 console.error('Error generando QR code:', error);
-                qrContainer.innerHTML = `<div class="error-message">Error generando QR</div>`;
+                qrContainer.innerHTML = `
+                    <div style="width: 150px; height: 150px; background: #f0f0f0; display: flex; align-items: center; justify-content: center; border: 1px solid #ddd; border-radius: 8px;">
+                        <span style="color: #666; font-size: 12px; text-align: center;">QR<br>Error</span>
+                    </div>
+                `;
             }
         }
 
@@ -799,67 +847,77 @@
             const resultDiv = document.getElementById('scanResult');
             const scanBtn = document.getElementById('scanBtn');
             const attendeeForm = document.getElementById('attendeeForm');
+            const eventSelect = document.getElementById('eventSelect');
+            
+            const selectedEventId = eventSelect.value;
+            
+            if (!selectedEventId) {
+                alert('Por favor selecciona un evento para simular el escaneo');
+                return;
+            }
             
             scanBtn.disabled = true;
             scanBtn.textContent = 'Escaneando...';
             
             try {
-                // Cargar eventos actuales si estamos conectados
-                if (isFirebaseConnected && events.length === 0) {
-                    const querySnapshot = await db.collection('events').get();
-                    events = [];
-                    querySnapshot.forEach((doc) => {
-                        const data = doc.data();
-                        events.push({
-                            id: doc.id,
-                            ...data
-                        });
-                    });
-                }
+                // Buscar el evento seleccionado
+                const selectedEvent = events.find(event => event.id === selectedEventId);
                 
-                if (events.length === 0) {
-                    resultDiv.innerHTML = '<div class="error-message">No hay eventos disponibles</div>';
+                if (!selectedEvent) {
+                    resultDiv.innerHTML = '<div class="error-message">Evento no encontrado</div>';
                     resultDiv.style.display = 'block';
                     return;
                 }
                 
-                // Simular que se escaneó un evento válido
-                const randomEvent = events[Math.floor(Math.random() * events.length)];
                 const now = new Date();
                 const daysOfWeek = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
                 
                 // Verificar si es el día correcto y dentro del tiempo permitido
                 const currentDay = now.getDay();
                 const currentTime = now.getHours() * 60 + now.getMinutes();
-                const eventTime = parseInt(randomEvent.time.split(':')[0]) * 60 + parseInt(randomEvent.time.split(':')[1]);
+                const eventTime = parseInt(selectedEvent.time.split(':')[0]) * 60 + parseInt(selectedEvent.time.split(':')[1]);
                 const timeDiff = Math.abs(currentTime - eventTime);
                 
-                if (currentDay === randomEvent.day && timeDiff <= 60) {
+                // Para demo, vamos a ser más flexibles con el tiempo
+                if (currentDay === selectedEvent.day && timeDiff <= 120) { // 2 horas de margen
                     // Evento válido - mostrar formulario
-                    currentScannedEvent = randomEvent;
+                    currentScannedEvent = selectedEvent;
                     
                     document.getElementById('eventInfo').innerHTML = `
-                        <h4>🎯 Evento: ${randomEvent.name}</h4>
-                        <p><strong>📍 Ubicación:</strong> ${randomEvent.location}</p>
-                        <p><strong>⏰ Hora:</strong> ${randomEvent.time}</p>
-                        <p><strong>📅 Día:</strong> ${daysOfWeek[randomEvent.day]}</p>
+                        <h4>🎯 Evento: ${selectedEvent.name}</h4>
+                        <p><strong>📍 Ubicación:</strong> ${selectedEvent.location}</p>
+                        <p><strong>⏰ Hora:</strong> ${selectedEvent.time}</p>
+                        <p><strong>📅 Día:</strong> ${daysOfWeek[selectedEvent.day]}</p>
+                        <p style="color: #4caf50; font-weight: bold;">✅ Evento válido para registro</p>
                     `;
                     
                     attendeeForm.style.display = 'block';
+                    resultDiv.style.display = 'none';
                     document.getElementById('attendeeName').focus();
                     
                 } else {
                     // Fuera del tiempo permitido
+                    const isWrongDay = currentDay !== selectedEvent.day;
+                    const isOutsideTime = timeDiff > 120;
+                    
+                    let reason = '';
+                    if (isWrongDay) {
+                        reason = `Hoy es ${daysOfWeek[currentDay]}, pero el evento es los ${daysOfWeek[selectedEvent.day]}s.`;
+                    } else if (isOutsideTime) {
+                        reason = 'Estás fuera del horario permitido para registro (2 horas antes del evento).';
+                    }
+                    
                     resultDiv.innerHTML = `
                         <div class="error-message">
                             <h3>❌ Registro No Disponible</h3>
-                            <p><strong>Evento:</strong> ${randomEvent.name}</p>
-                            <p><strong>Día programado:</strong> ${daysOfWeek[randomEvent.day]}</p>
-                            <p><strong>Hora:</strong> ${randomEvent.time}</p>
-                            <p>Solo puedes registrarte 1 hora antes del inicio del evento y en el día correcto.</p>
+                            <p><strong>Evento:</strong> ${selectedEvent.name}</p>
+                            <p><strong>Día programado:</strong> ${daysOfWeek[selectedEvent.day]}</p>
+                            <p><strong>Hora:</strong> ${selectedEvent.time}</p>
+                            <p><strong>Motivo:</strong> ${reason}</p>
                         </div>
                     `;
                     resultDiv.style.display = 'block';
+                    attendeeForm.style.display = 'none';
                     
                     setTimeout(() => {
                         resultDiv.style.display = 'none';
@@ -872,7 +930,7 @@
                 resultDiv.style.display = 'block';
             } finally {
                 scanBtn.disabled = false;
-                scanBtn.textContent = '📷 Escanear QR';
+                scanBtn.textContent = '📷 Simular Escaneo QR';
             }
         }
 
