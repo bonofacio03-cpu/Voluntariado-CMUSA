@@ -378,7 +378,7 @@
                 <input type="text" id="eventLocation" required>
             </div>
             
-            <button type="button" class="btn btn-success" onclick="createEvent()">Crear Evento</button>
+            <button type="button" class="btn btn-success" id="createEventBtn" onclick="handleCreateEvent()">Crear Evento</button>
             
             <div id="createMessage" class="message" style="display: none;"></div>
         </div>
@@ -552,34 +552,48 @@
         }
 
         // Funciones de eventos
-        function createEvent() {
-            const name = document.getElementById('eventName').value;
+        function handleCreateEvent() {
+            const name = document.getElementById('eventName').value.trim();
             const day = document.getElementById('eventDay').value;
             const time = document.getElementById('eventTime').value;
-            const location = document.getElementById('eventLocation').value;
+            const location = document.getElementById('eventLocation').value.trim();
             
             if (!name || !day || !time || !location) {
                 showMessage('createMessage', 'Por favor completa todos los campos', 'error');
                 return;
             }
             
-            const newEvent = {
-                id: 'event-' + Date.now(),
-                name: name,
-                day: parseInt(day),
-                time: time,
-                location: location
-            };
-            
-            events.push(newEvent);
-            
-            // Limpiar formulario
-            document.getElementById('eventName').value = '';
-            document.getElementById('eventDay').value = '';
-            document.getElementById('eventTime').value = '';
-            document.getElementById('eventLocation').value = '';
-            
-            showMessage('createMessage', '¡Evento creado exitosamente!', 'success');
+            try {
+                const newEvent = {
+                    id: 'event-' + Date.now(),
+                    name: name,
+                    day: parseInt(day),
+                    time: time,
+                    location: location,
+                    created: new Date().toISOString()
+                };
+                
+                events.push(newEvent);
+                
+                console.log('Evento creado:', newEvent);
+                
+                // Limpiar formulario
+                document.getElementById('eventName').value = '';
+                document.getElementById('eventDay').value = '';
+                document.getElementById('eventTime').value = '';
+                document.getElementById('eventLocation').value = '';
+                
+                showMessage('createMessage', '¡Evento creado exitosamente!', 'success');
+                
+                // Opcional: regresar al panel después de 2 segundos
+                setTimeout(() => {
+                    showPage('organizerPanel');
+                }, 2000);
+                
+            } catch (error) {
+                console.error('Error creando evento:', error);
+                showMessage('createMessage', 'Error al crear el evento. Inténtalo de nuevo.', 'error');
+            }
         }
 
         function loadEvents() {
